@@ -41,13 +41,22 @@ check:
     just test
 
 # Start local dev environment
-up:
+docker-up:
     docker compose up -d
 
 # Stop local dev environment
-down:
+docker-down:
     docker compose down
 
 # Tail all container logs
 logs:
     docker compose logs -f
+
+# Stop all containers and wipe all images, volumes, and build cache
+docker-prune:
+    docker stop $(docker ps -a -q) || true
+    docker system prune --all --volumes --force
+
+# Open an interactive shell inside a fresh app container
+docker-shell:
+    docker compose run --rm app bash

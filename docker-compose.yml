@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+    env_file:
+      - ${LOCAL_ENV_FILE:-.env}
+    depends_on:
+      - localstack
+
+  localstack:
+    image: localstack/localstack:3
+    ports:
+      - "4566:4566"
+    environment:
+      - LOCALSTACK_HOST=localstack

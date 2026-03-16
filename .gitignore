@@ -15,6 +15,7 @@ build/
 # Environment files
 .env
 .env.*
+!.env.local
 
 # Test & coverage artefacts
 .pytest_cache/
