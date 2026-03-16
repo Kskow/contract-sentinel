@@ -29,9 +29,22 @@ uv sync
 # 2. Run the full quality gate (lint + format + types + tests)
 just check
 
-# 3. Start the local dev environment (Docker + LocalStack)
-just up
+# 3. Copy the env template and start the local dev environment
+cp .env.local .env
+just docker-up
 ```
+
+> **Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/), [uv](https://docs.astral.sh/uv/getting-started/installation/), and [just](https://just.systems) must be installed.
+
+## Docker Commands
+
+| Command | What it does |
+|---|---|
+| `just docker-up` | Start app + LocalStack in the background |
+| `just docker-down` | Stop all containers |
+| `just docker-shell` | Open an interactive shell inside the app container |
+| `just logs` | Tail all container logs |
+| `just docker-prune` | Stop everything and wipe all images, volumes, and build cache |
 
 ## Project Structure
 
@@ -58,6 +71,17 @@ tests/
 | Testing | `pytest` + `pytest-xdist` |
 | Local AWS emulation | LocalStack |
 | Task runner | `just` |
+| CI | GitHub Actions |
+
+## CI
+
+Every push and pull request targeting `main` runs the full quality gate via GitHub Actions:
+
+```
+Lint → Format check → Type check → Test
+```
+
+Each step is isolated so the PR UI shows exactly which gate failed.
 
 ## Contributing
 
