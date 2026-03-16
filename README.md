@@ -22,7 +22,7 @@ Contract Sentinel is an open-source contract testing tool for Python that **elim
 
 ## Quickstart
 
-> **Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) must be installed.
+> **Prerequisites:** Docker Engine must be installed.
 
 ```bash
 # 1. Copy the env template
@@ -52,10 +52,6 @@ just check
 
 ```
 contract_sentinel/
-├── domain/      # Pure business logic — no I/O, no infra imports
-├── ports/       # Abstract interfaces (Protocol)
-├── adapters/    # Concrete cloud + local implementations
-└── cli/         # Typer CLI entrypoints
 
 tests/
 ├── unit/        # Pure logic tests — no infra, no I/O mocking
