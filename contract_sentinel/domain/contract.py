@@ -36,8 +36,8 @@ class ContractField:
 
     name: str
     type: str
-    required: bool
-    allow_none: bool
+    is_required: bool
+    is_nullable: bool
     default: object = dataclasses.field(default=MISSING)
     fields: list[ContractField] | None = None
     metadata: dict[str, Any] | None = None
@@ -47,8 +47,8 @@ class ContractField:
         result: dict[str, Any] = {
             "name": self.name,
             "type": self.type,
-            "required": self.required,
-            "allow_none": self.allow_none,
+            "is_required": self.is_required,
+            "is_nullable": self.is_nullable,
         }
         if self.default is not MISSING:
             result["default"] = self.default
@@ -65,8 +65,8 @@ class ContractField:
         kwargs: dict[str, Any] = {
             "name": data["name"],
             "type": data["type"],
-            "required": data["required"],
-            "allow_none": data["allow_none"],
+            "is_required": data["is_required"],
+            "is_nullable": data["is_nullable"],
         }
         if "default" in data:
             kwargs["default"] = data["default"]

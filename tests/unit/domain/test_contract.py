@@ -11,8 +11,8 @@ class TestContractField:
         field = ContractField(
             name="email",
             type="str",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             default="user@example.com",
             unknown=UnknownFieldBehaviour.IGNORE,
         )
@@ -20,46 +20,48 @@ class TestContractField:
         assert field.to_dict() == {
             "name": "email",
             "type": "str",
-            "required": True,
-            "allow_none": False,
+            "is_required": True,
+            "is_nullable": False,
             "default": "user@example.com",
             "unknown": "ignore",
         }
 
     def test_init_sets_missing_default_when_not_provided(self) -> None:
-        field = ContractField(name="age", type="int", required=False, allow_none=False)
+        field = ContractField(name="age", type="int", is_required=False, is_nullable=False)
 
         assert field.default is MISSING
 
     def test_to_dict_omits_default_when_missing(self) -> None:
-        field = ContractField(name="age", type="int", required=False, allow_none=False)
+        field = ContractField(name="age", type="int", is_required=False, is_nullable=False)
 
         assert "default" not in field.to_dict()
 
     def test_to_dict_includes_default_null_when_none(self) -> None:
-        field = ContractField(name="age", type="int", required=False, allow_none=True, default=None)
+        field = ContractField(
+            name="age", type="int", is_required=False, is_nullable=True, default=None
+        )
 
         assert field.to_dict()["default"] is None
 
     def test_to_dict_serialises_nested_fields_recursively(self) -> None:
-        child = ContractField(name="street", type="str", required=True, allow_none=False)
+        child = ContractField(name="street", type="str", is_required=True, is_nullable=False)
         parent = ContractField(
             name="address",
             type="object",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             fields=[child],
         )
 
         assert parent.to_dict()["fields"] == [child.to_dict()]
 
     def test_from_dict_deserialises_nested_fields_recursively(self) -> None:
-        child = ContractField(name="street", type="str", required=True, allow_none=False)
+        child = ContractField(name="street", type="str", is_required=True, is_nullable=False)
         parent = ContractField(
             name="address",
             type="object",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             fields=[child],
         )
 
@@ -69,8 +71,8 @@ class TestContractField:
         field = ContractField(
             name="count",
             type="int",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             unknown=UnknownFieldBehaviour.IGNORE,
         )
 
@@ -80,15 +82,15 @@ class TestContractField:
         field = ContractField(
             name="created_at",
             type="datetime",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             metadata={"format": "iso8601", "timezone": "utc"},
         )
 
         assert field.to_dict()["metadata"] == {"format": "iso8601", "timezone": "utc"}
 
     def test_to_dict_omits_metadata_when_none(self) -> None:
-        field = ContractField(name="age", type="int", required=True, allow_none=False)
+        field = ContractField(name="age", type="int", is_required=True, is_nullable=False)
 
         assert "metadata" not in field.to_dict()
 
@@ -96,8 +98,8 @@ class TestContractField:
         field = ContractField(
             name="price",
             type="decimal",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             metadata={"places": 2, "rounding": "ROUND_HALF_UP"},
         )
 
@@ -107,8 +109,8 @@ class TestContractField:
         field = ContractField(
             name="label",
             type="str",
-            required=False,
-            allow_none=True,
+            is_required=False,
+            is_nullable=True,
             default=None,
         )
 
@@ -130,17 +132,17 @@ class TestContractSchema:
         assert ContractSchema.from_dict(schema.to_dict()) == schema
 
     def test_round_trip_preserves_equality_with_multiple_fields(self) -> None:
-        nested = ContractField(name="street", type="str", required=True, allow_none=False)
+        nested = ContractField(name="street", type="str", is_required=True, is_nullable=False)
         address = ContractField(
             name="address",
             type="object",
-            required=True,
-            allow_none=False,
+            is_required=True,
+            is_nullable=False,
             fields=[nested],
             unknown=UnknownFieldBehaviour.ALLOW,
         )
         name_field = ContractField(
-            name="name", type="str", required=True, allow_none=False, default="anonymous"
+            name="name", type="str", is_required=True, is_nullable=False, default="anonymous"
         )
         schema = ContractSchema(
             topic="users.registered",

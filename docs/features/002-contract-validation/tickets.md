@@ -131,6 +131,7 @@ All AWS vars are already present in `.env.local`. Add the `SENTINEL_*` vars to `
 
 **Depends on:** —
 **Type:** Infra config
+**Status: ✅ Done**
 
 **Goal:**
 Establish the single `Settings` class that every other layer depends on. All configuration comes
@@ -143,21 +144,21 @@ vars for sentinel-specific options. No config files are read at runtime.
 - `pyproject.toml` — modify (add `pydantic-settings` via `uv add pydantic-settings`)
 
 **Done when:**
-- [ ] `settings.py` defines the `Settings` class only — no module-level instantiation.
+- [x] `settings.py` defines the `Settings` class only — no module-level instantiation.
       `Settings()` is only constructed inside CLI command handlers, never on import, so that
       importing any `contract_sentinel` module never crashes a user's environment
-- [ ] `Settings` uses `pydantic-settings` `BaseSettings` with `env_prefix="SENTINEL_"`;
+- [x] `Settings` uses `pydantic-settings` `BaseSettings` with `env_prefix="SENTINEL_"`;
       AWS vars override the prefix via `validation_alias` (e.g. `Field(validation_alias="AWS_ACCESS_KEY_ID")`)
-- [ ] Sentinel env vars map to clean attribute names without the prefix:
+- [x] Sentinel env vars map to clean attribute names without the prefix:
       `SENTINEL_NAME` → `name`, `SENTINEL_FRAMEWORK` → `framework`,
       `SENTINEL_S3_BUCKET` → `s3_bucket`, `SENTINEL_S3_PATH` → `s3_path`
-- [ ] `Settings()` raises `ValidationError` at instantiation when `AWS_ACCESS_KEY_ID`,
+- [x] `Settings()` raises `ValidationError` at instantiation when `AWS_ACCESS_KEY_ID`,
       `AWS_SECRET_ACCESS_KEY`, `SENTINEL_NAME`, or `SENTINEL_S3_BUCKET` are absent
-- [ ] `Settings()` defaults `aws_default_region` to `"us-east-1"` when `AWS_DEFAULT_REGION` is not set
-- [ ] `Settings()` defaults `aws_endpoint_url` to `None` when `AWS_ENDPOINT_URL` is not set
-- [ ] `Settings()` defaults `framework` to `"marshmallow"` when `SENTINEL_FRAMEWORK` is not set
-- [ ] `Settings()` defaults `s3_path` to `"contract_tests"` when `SENTINEL_S3_PATH` is not set
-- [ ] `just check` passes
+- [x] `Settings()` defaults `aws_default_region` to `"us-east-1"` when `AWS_DEFAULT_REGION` is not set
+- [x] `Settings()` defaults `aws_endpoint_url` to `None` when `AWS_ENDPOINT_URL` is not set
+- [x] `Settings()` defaults `framework` to `"marshmallow"` when `SENTINEL_FRAMEWORK` is not set
+- [x] `Settings()` defaults `s3_path` to `"contract_tests"` when `SENTINEL_S3_PATH` is not set
+- [x] `just check` passes
 
 ---
 
@@ -165,6 +166,7 @@ vars for sentinel-specific options. No config files are read at runtime.
 
 **Depends on:** —
 **Type:** Domain
+**Status: ✅ Done**
 
 **Goal:**
 Implement the `@contract` decorator and `Role` enum that users apply to their schema
@@ -176,14 +178,14 @@ classes.
 - `tests/unit/test_marker.py` — create
 
 **Done when:**
-- [ ] `Role` enum has exactly two members: `PRODUCER` and `CONSUMER`
-- [ ] `@contract(topic="t", role=Role.PRODUCER, version="1.0.0")` sets
+- [x] `Role` enum has exactly two members: `PRODUCER` and `CONSUMER`
+- [x] `@contract(topic="t", role=Role.PRODUCER, version="1.0.0")` sets
       `__contract__` on the decorated class
-- [ ] `__contract__` contains the exact `topic`, `role`, and `version` values
-- [ ] Applying the decorator to a class does not alter any other class attribute
-- [ ] `contract_sentinel/__init__.py` exports `contract` and `Role` in `__all__` —
+- [x] `__contract__` contains the exact `topic`, `role`, and `version` values
+- [x] Applying the decorator to a class does not alter any other class attribute
+- [x] `contract_sentinel/__init__.py` exports `contract` and `Role` in `__all__` —
       these are the only public API symbols users need to import
-- [ ] `just check` passes
+- [x] `just check` passes
 
 ---
 
@@ -191,6 +193,7 @@ classes.
 
 **Depends on:** —
 **Type:** Domain
+**Status: ✅ Done**
 
 **Goal:**
 Define the canonical `ContractField` and `ContractSchema` value objects that every other layer
@@ -202,22 +205,23 @@ exchanges, plus the typed domain errors used by the factory.
 - `tests/unit/test_contract.py` — create
 
 **Done when:**
-- [ ] `UnknownFieldBehaviour` is a `str`-based `Enum` in `contract.py` with three members:
+- [x] `UnknownFieldBehaviour` is a `str`-based `Enum` in `contract.py` with three members:
       `FORBID = "forbid"`, `IGNORE = "ignore"`, `ALLOW = "allow"` — these are the only values
       that appear in the canonical JSON format; no Marshmallow constants appear in this file
-- [ ] `ContractField` is a dataclass with fields: `name`, `type`, `required`, `allow_none`,
-      `default` (optional), `fields` (optional list of `ContractField`),
-      `unknown` (`UnknownFieldBehaviour | None`, default `None` — only populated when
+- [x] `ContractField` is a dataclass with fields: `name`, `type`, `is_required`, `is_nullable`,
+      `default` (uses `MISSING` sentinel when absent — distinct from `default=None`),
+      `fields` (optional list of `ContractField`), `metadata` (optional `dict[str, Any]` for
+      type-specific extras), `unknown` (`UnknownFieldBehaviour | None` — only populated when
       `type == "object"`, carries the nested schema's own policy)
-- [ ] `ContractSchema` is a dataclass with fields: `topic`, `role`, `version`, `repository`,
-      `class_name`, `unknown` (`UnknownFieldBehaviour`, default `UnknownFieldBehaviour.FORBID`),
-      `fields` (list of `ContractField`)
-- [ ] `ContractSchema` can be serialised to a dict and round-tripped back without data loss
-- [ ] `UnsupportedFrameworkError` and `UnsupportedStorageError` are defined as domain exceptions
+- [x] `ContractSchema` is a dataclass with fields: `topic`, `role`, `version`, `repository`,
+      `class_name`, `unknown` (`UnknownFieldBehaviour`), `fields` (list of `ContractField`) —
+      no default values; always constructed with explicit arguments
+- [x] `ContractSchema` can be serialised to a dict and round-tripped back without data loss
+- [x] `UnsupportedFrameworkError` and `UnsupportedStorageError` are defined as domain exceptions
       (subclass `Exception`) in `errors.py`
-- [ ] `MissingDependencyError` is defined in `errors.py` — raised when an optional extra is
+- [x] `MissingDependencyError` is defined in `errors.py` — raised when an optional extra is
       required but not installed; message must include the `pip install` command as a hint
-- [ ] `just check` passes
+- [x] `just check` passes
 
 ---
 
@@ -225,6 +229,7 @@ exchanges, plus the typed domain errors used by the factory.
 
 **Depends on:** TICKET-03
 **Type:** Domain
+**Status: ✅ Done**
 
 **Goal:**
 Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four MVP rule classes.
@@ -234,25 +239,24 @@ Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four
 - `tests/unit/test_validation_rules.py` — create
 
 **Done when:**
-- [ ] `Violation` is a dataclass with fields: `rule`, `severity`, `field_path`, `producer` (dict),
-      `consumer` (dict), `message`
-- [ ] `ValidationRule` is a `Protocol` with method
-      `check(producer_field, consumer_field) -> list[Violation]`
-- [ ] `TypeMismatchRule.check()` returns a `CRITICAL` `Violation` when producer and consumer
-      `type` differ, and returns `[]` when they match
-- [ ] `RequirementMismatchRule.check()` returns a `CRITICAL` `Violation` when producer
-      `required=False` and consumer `required=True` with no default, and returns `[]` otherwise
-- [ ] `NullabilityMismatchRule.check()` returns a `CRITICAL` `Violation` when producer
-      `allow_none=True` and consumer `allow_none=False`, and returns `[]` otherwise
-- [ ] `MissingFieldRule.check()` returns a `CRITICAL` `Violation` when the field is absent from
-      the producer but `required=True` with no default on the consumer, and returns `[]` otherwise
-- [ ] `UndeclaredFieldRule` is instantiated with `consumer_unknown: UnknownFieldBehaviour`;
-      `check()` returns a `CRITICAL` `Violation` when `consumer_field is None` (field absent from
-      consumer) and `consumer_unknown == UnknownFieldBehaviour.FORBID`, and returns `[]` when
-      `consumer_unknown` is `IGNORE` or `ALLOW` — no Marshmallow constants appear in this file
-- [ ] Unit tests cover all three branches: `FORBID` produces a violation, `IGNORE` and `ALLOW`
-      each return `[]`
-- [ ] `just check` passes
+- [x] `Violation` is a dataclass with fields: `rule`, `severity`, `field_path`, `producer` (dict),
+      `consumer` (dict), `message`; exposes `to_dict() -> dict[str, Any]`
+- [x] Three ABCs replace the single `ValidationRule` Protocol:
+      `BinaryRule.check(producer, consumer)`, `ProducerOnlyRule.check(producer)`,
+      `ConsumerOnlyRule.check(consumer)` — all return `list[Violation]`
+- [x] `TypeMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when `producer.type != consumer.type`
+- [x] `RequirementMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when
+      `producer.is_required=False` and `consumer.is_required=True` with no default
+- [x] `NullabilityMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when
+      `producer.is_nullable=True` and `consumer.is_nullable=False`
+- [x] `MissingFieldRule(ConsumerOnlyRule)` returns a `CRITICAL` `Violation` when
+      `consumer.is_required=True` with no default (producer absence is guaranteed by dispatch)
+- [x] `UndeclaredFieldRule(ProducerOnlyRule)` carries `consumer_unknown: UnknownFieldBehaviour`;
+      returns a `CRITICAL` `Violation` when `consumer_unknown == FORBID`; returns `[]` for
+      `IGNORE` or `ALLOW`
+- [x] `MetadataMismatchRule(BinaryRule)` returns one `CRITICAL` `Violation` per consumer-declared
+      metadata key that differs from the producer (including keys absent from producer metadata)
+- [x] `just check` passes
 
 ---
 
@@ -287,7 +291,7 @@ dependencies.
 
 **Goal:**
 Implement the import-based scanner that walks `.py` files and returns all classes marked with
-`@contract_sentinel`.
+`@contract`.
 
 **Files to create / modify:**
 - `contract_sentinel/domain/loader.py` — create

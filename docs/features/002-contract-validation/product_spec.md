@@ -1,7 +1,7 @@
 # Product Spec — Contract Validation
 
 **Feature slug:** `002-contract-validation`
-**Status:** `ready-for-dev`
+**Status:** `in-progress`
 **Created:** 2026-03-16
 
 ---
@@ -26,8 +26,9 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
 - Parse Marshmallow schemas into a canonical, framework-agnostic JSON contract format.
 - Store and retrieve versioned contract files in S3 so producer and consumer services can exchange
   contracts without sharing a codebase.
-- Validate producer–consumer contract compatibility using four rules: `TYPE_MISMATCH`,
-  `REQUIREMENT_MISMATCH`, `NULLABILITY_MISMATCH`, `MISSING_FIELD`.
+- Validate producer–consumer contract compatibility using five rules: `TYPE_MISMATCH`,
+  `REQUIREMENT_MISMATCH`, `NULLABILITY_MISMATCH`, `MISSING_FIELD`, `UNDECLARED_FIELD`, and
+  `METADATA_MISMATCH`.
 - Provide a `sentinel validate` CLI command that acts as a PR gate (exits `1` on violations).
 - Provide a `sentinel publish` CLI command that pushes changed contracts to S3 after merge.
 - Read all tool configuration from `[tool.sentinel]` in `pyproject.toml`, with environment
@@ -59,7 +60,7 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
    classes without the decorator are ignored.
 
 3. A Marshmallow schema is parsed into a `ContractSchema` value object with correct `name`, `type`,
-   `required`, `allow_none`, `default`, and nested `fields` for each field.
+   `is_required`, `is_nullable`, `default`, `metadata`, and nested `fields` for each field.
 
 4. `sentinel publish` writes a canonical JSON contract file to S3 at the path
    `contract_tests/<topic>/<version>/<role>_<repo>_<class>.json`.

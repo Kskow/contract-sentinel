@@ -4,7 +4,7 @@
 
 ```
 Config Layer:    Settings (pydantic-settings, env vars) + SentinelConfig (pyproject.toml)
-Domain Layer:    ContractSchema (value object), Violation, ValidationRule
+Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule
 Port Layer:      ContractStore (Protocol), SchemaParser (Protocol)
 Adapter Layer:   S3ContractStore, MarshmallowParser
 Factory Layer:   get_parser(config) -> SchemaParser, get_store(config, settings) -> ContractStore
@@ -21,7 +21,7 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | Marker decorator + `Role` enum | `contract_sentinel/domain/marker.py` |
 | Loader scanner | `contract_sentinel/domain/loader.py` |
 | `ContractSchema` value object | `contract_sentinel/domain/contract.py` |
-| `Violation` + `ValidationRule` Protocol | `contract_sentinel/domain/validation.py` |
+| `Violation` + validation rule ABCs | `contract_sentinel/domain/validation.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` port | `contract_sentinel/ports/contract_store.py` |
 | `SchemaParser` port | `contract_sentinel/ports/schema_parser.py` |
@@ -85,8 +85,9 @@ MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
 |---|---|
 | `name` | Field name as declared |
 | `type` | `"string"`, `"integer"`, `"boolean"`, `"list"`, `"dict"`, `"object"` |
-| `required` | `true` if no default and `allow_none=False` |
-| `allow_none` | Whether `null` is a valid value |
+| `is_required` | `true` if the field has no default |
+| `is_nullable` | Whether `null` is a valid value |
+| `metadata` | Optional dict of type-specific extras (e.g. `{"format": "iso8601"}`); omitted when absent |
 | `default` | Default value, or absent if none |
 | `fields` | Nested field list — present when `type` is `"object"` or `"list[object]"` |
 | `unknown` | Framework-agnostic unknown-field policy — `"forbid"`, `"ignore"`, or `"allow"`; present only when `type` is `"object"`, representing the nested schema's own policy |
@@ -180,8 +181,13 @@ Each consumer is validated against every producer on the same topic. Any failing
 
 Directional validation: "can the consumer safely consume what this producer sends?"
 
-Each rule is a separate class implementing `ValidationRule`:
-`check(producer_field, consumer_field) -> list[Violation]`
+Rules are split into three ABCs based on which fields are present at the call site:
+
+- `BinaryRule.check(producer, consumer)` — both fields exist; used for type, nullability, requirement, and metadata checks
+- `ConsumerOnlyRule.check(consumer)` — producer has no such field; used for missing field checks
+- `ProducerOnlyRule.check(producer)` — consumer has no such field; used for undeclared field checks
+
+The service layer dispatches to the right group based on field presence — no rule ever receives a `None` argument.
 
 ### MVP Rules
 
@@ -191,7 +197,8 @@ Each rule is a separate class implementing `ValidationRule`:
 | `REQUIREMENT_MISMATCH` | Producer optional, consumer required (no default) | CRITICAL |
 | `NULLABILITY_MISMATCH` | Producer allows `null`, consumer does not | CRITICAL |
 | `MISSING_FIELD` | Field absent from producer, required by consumer (no default) | CRITICAL |
-| `UNDECLARED_FIELD` | Producer has a field not declared in consumer schema **and** consumer `unknown == "RAISE"` | CRITICAL |
+| `UNDECLARED_FIELD` | Producer has a field not declared in consumer schema and consumer `unknown == "forbid"` | CRITICAL |
+| `METADATA_MISMATCH` | A metadata key declared by consumer differs from (or is absent in) producer | CRITICAL |
 
 > **`UNDECLARED_FIELD` directionality:** The unknown-field policy only applies during `load()`
 > (deserialization), which is what the **consumer** does. The producer serializes (`dump()`) its
@@ -202,8 +209,8 @@ Each rule is a separate class implementing `ValidationRule`:
 > **Rule constructor:** `UndeclaredFieldRule` carries `consumer_unknown: UnknownFieldBehaviour` as
 > a constructor parameter. The service layer reads `ContractSchema.unknown` (or
 > `ContractField.unknown` for nested objects) from the consumer contract and instantiates the rule
-> with the correct value per schema pair. The `check(producer_field, consumer_field)` Protocol
-> signature remains unchanged. The rule never references any framework-specific constant.
+> with the correct value per schema pair. `UndeclaredFieldRule` extends `ProducerOnlyRule` — `check(producer)` takes only the producer field;
+> the consumer field is guaranteed absent by the dispatch layer. The rule never references any framework-specific constant.
 
 ### Violation Report Format
 
@@ -229,8 +236,8 @@ Each rule is a separate class implementing `ValidationRule`:
       "rule": "REQUIREMENT_MISMATCH",
       "severity": "CRITICAL",
       "field_path": "metadata.discount_code",
-      "producer": { "required": false },
-      "consumer": { "required": true },
+      "producer": { "is_required": false },
+      "consumer": { "is_required": true },
       "message": "Field 'metadata.discount_code' is optional in Producer but required in Consumer."
     },
     {
@@ -238,15 +245,15 @@ Each rule is a separate class implementing `ValidationRule`:
       "severity": "CRITICAL",
       "field_path": "items.sku",
       "producer": { "exists": false },
-      "consumer": { "required": true },
+      "consumer": { "is_required": true },
       "message": "Field 'items.sku' is missing in Producer but required in Consumer."
     },
     {
       "rule": "NULLABILITY_MISMATCH",
       "severity": "CRITICAL",
       "field_path": "total_price",
-      "producer": { "allow_none": true },
-      "consumer": { "allow_none": false },
+      "producer": { "is_nullable": true },
+      "consumer": { "is_nullable": false },
       "message": "Field 'total_price' allows null in Producer but Consumer expects a value."
     },
     {
@@ -272,7 +279,7 @@ Each rule is a separate class implementing `ValidationRule`:
 1. Load config.
 2. Scan and parse local schemas (skippable via `--skip-scan`).
 3. Fetch latest contracts from S3 per topic (by `LastModified`).
-4. Run all `ValidationRule`s for each producer–consumer pair.
+4. Dispatch each field pair to `BinaryRule`, `ConsumerOnlyRule`, or `ProducerOnlyRule` based on field presence and collect all violations.
 5. Print violation report.
 6. Exit `1` on any violations, exit `0` on pass.
 

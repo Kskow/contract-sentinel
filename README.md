@@ -52,6 +52,15 @@ just check
 
 ```
 contract_sentinel/
+├── domain/          # Pure business logic — no I/O, no infra imports
+│   ├── marker.py    # @contract decorator + Role enum
+│   ├── contract.py  # ContractField, ContractSchema, UnknownFieldBehaviour
+│   ├── validation.py # Violation, BinaryRule, ProducerOnlyRule, ConsumerOnlyRule + rule classes
+│   └── errors.py    # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
+├── ports/           # Abstract interfaces (Protocol classes)
+├── adapters/        # Concrete implementations of ports
+├── services/        # Use-case orchestration (validate, publish)
+└── cli/             # Typer CLI entrypoints
 
 tests/
 ├── unit/        # Pure logic tests — no infra, no I/O mocking
