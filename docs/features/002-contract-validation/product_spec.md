@@ -59,7 +59,7 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
    classes without the decorator are ignored.
 
 3. A Marshmallow schema is parsed into a `ContractSchema` value object with correct `name`, `type`,
-   `required`, `allow_none`, `default`, nested `fields`, and enum `members` for each field.
+   `required`, `allow_none`, `default`, and nested `fields` for each field.
 
 4. `sentinel publish` writes a canonical JSON contract file to S3 at the path
    `contract_tests/<topic>/<version>/<role>_<repo>_<class>.json`.

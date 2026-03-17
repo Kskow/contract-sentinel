@@ -206,7 +206,7 @@ exchanges, plus the typed domain errors used by the factory.
       `FORBID = "forbid"`, `IGNORE = "ignore"`, `ALLOW = "allow"` — these are the only values
       that appear in the canonical JSON format; no Marshmallow constants appear in this file
 - [ ] `ContractField` is a dataclass with fields: `name`, `type`, `required`, `allow_none`,
-      `default` (optional), `fields` (optional list of `ContractField`), `members` (optional list),
+      `default` (optional), `fields` (optional list of `ContractField`),
       `unknown` (`UnknownFieldBehaviour | None`, default `None` — only populated when
       `type == "object"`, carries the nested schema's own policy)
 - [ ] `ContractSchema` is a dataclass with fields: `topic`, `role`, `version`, `repository`,
@@ -334,7 +334,6 @@ schema class into a `ContractSchema`.
 - [ ] `parse(cls)` correctly sets `required=True` for fields with no default and `allow_none=False`
 - [ ] `parse(cls)` correctly captures `default` when a marshmallow field has one
 - [ ] `parse(cls)` populates `fields` recursively for a nested `Schema` field
-- [ ] `parse(cls)` populates `members` with string values for an `EnumField`
 - [ ] `parse(cls)` reads the top-level schema's effective unknown-field policy from the instantiated
       schema's `_meta.unknown` attribute (not from `class Meta` directly — inheritance must be
       respected) and maps it to `UnknownFieldBehaviour`: `marshmallow.RAISE → FORBID`,

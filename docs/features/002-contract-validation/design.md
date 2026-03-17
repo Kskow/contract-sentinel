@@ -89,7 +89,6 @@ MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
 | `allow_none` | Whether `null` is a valid value |
 | `default` | Default value, or absent if none |
 | `fields` | Nested field list — present when `type` is `"object"` or `"list[object]"` |
-| `members` | Enum member values — present when type is an enum |
 | `unknown` | Framework-agnostic unknown-field policy — `"forbid"`, `"ignore"`, or `"allow"`; present only when `type` is `"object"`, representing the nested schema's own policy |
 
 ### Contract Envelope
