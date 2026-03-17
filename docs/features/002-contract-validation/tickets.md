@@ -25,7 +25,7 @@ User decorates schema class with @contract(...)
          ↓
 sentinel validate / sentinel publish  (CLI entry)
          ↓
-Load Settings (env vars — AWS_* + SENTINEL_* prefix)
+Load Config (env vars — AWS_*, S3_BUCKET, SENTINEL_* prefix)
          ↓
 Factory → picks MarshmallowParser + S3ContractStore based on config
          ↓
@@ -45,7 +45,7 @@ Exit 1 (violations) / 0 (pass)      Exit 0 always
 
 ```
 contract_sentinel/
-├── settings.py
+├── config.py
 ├── factory.py
 ├── domain/
 │   ├── __init__.py
@@ -74,7 +74,7 @@ contract_sentinel/
 
 tests/
 ├── unit/
-│   ├── test_settings.py
+│   ├── test_config.py
 │   ├── test_marker.py
 │   ├── test_contract.py
 │   ├── test_validation_rules.py
@@ -118,7 +118,7 @@ tests/
 | `AWS_ENDPOINT_URL` | `.env` (local) | `"http://localhost:4566"` for LocalStack; absent in prod |
 | `SENTINEL_NAME` | `.env` (local), CI env | Repository / project name; required |
 | `SENTINEL_FRAMEWORK` | `.env` (local), CI env | Schema framework; defaults to `"marshmallow"` |
-| `SENTINEL_S3_BUCKET` | `.env` (local), CI env | S3 bucket for contract storage; required |
+| `S3_BUCKET` | `.env` (local), CI env | S3 bucket for contract storage; required |
 | `SENTINEL_S3_PATH` | `.env` (local), CI env | S3 key prefix; defaults to `"contract_tests"` |
 
 All AWS vars are already present in `.env.local`. Add the `SENTINEL_*` vars to `.env.local` for local dev. No new CI secrets needed for this feature.
@@ -127,37 +127,32 @@ All AWS vars are already present in `.env.local`. Add the `SENTINEL_*` vars to `
 
 ## Tickets
 
-### TICKET-01 — Config: Settings
+### TICKET-01 — Config
 
 **Depends on:** —
 **Type:** Infra config
 **Status: ✅ Done**
 
 **Goal:**
-Establish the single `Settings` class that every other layer depends on. All configuration comes
-from environment variables — standard `AWS_*` vars for AWS credentials, and `SENTINEL_`-prefixed
-vars for sentinel-specific options. No config files are read at runtime.
+Establish the single `Config` class that every other layer depends on. All configuration comes
+from environment variables — standard `AWS_*` vars for AWS credentials, `S3_BUCKET` for storage,
+and `SENTINEL_`-prefixed vars for Sentinel-specific options. No config files are read at runtime.
 
 **Files to create / modify:**
-- `contract_sentinel/settings.py` — create
-- `tests/unit/test_settings.py` — create
-- `pyproject.toml` — modify (add `pydantic-settings` via `uv add pydantic-settings`)
+- `contract_sentinel/config.py` — create
+- `tests/unit/test_config.py` — create
 
 **Done when:**
-- [x] `settings.py` defines the `Settings` class only — no module-level instantiation.
-      `Settings()` is only constructed inside CLI command handlers, never on import, so that
+- [x] `config.py` defines the `Config` class only — no module-level instantiation.
+      `Config()` is only constructed inside CLI command handlers, never on import, so that
       importing any `contract_sentinel` module never crashes a user's environment
-- [x] `Settings` uses `pydantic-settings` `BaseSettings` with `env_prefix="SENTINEL_"`;
-      AWS vars override the prefix via `validation_alias` (e.g. `Field(validation_alias="AWS_ACCESS_KEY_ID")`)
-- [x] Sentinel env vars map to clean attribute names without the prefix:
-      `SENTINEL_NAME` → `name`, `SENTINEL_FRAMEWORK` → `framework`,
-      `SENTINEL_S3_BUCKET` → `s3_bucket`, `SENTINEL_S3_PATH` → `s3_path`
-- [x] `Settings()` raises `ValidationError` at instantiation when `AWS_ACCESS_KEY_ID`,
-      `AWS_SECRET_ACCESS_KEY`, `SENTINEL_NAME`, or `SENTINEL_S3_BUCKET` are absent
-- [x] `Settings()` defaults `aws_default_region` to `"us-east-1"` when `AWS_DEFAULT_REGION` is not set
-- [x] `Settings()` defaults `aws_endpoint_url` to `None` when `AWS_ENDPOINT_URL` is not set
-- [x] `Settings()` defaults `framework` to `"marshmallow"` when `SENTINEL_FRAMEWORK` is not set
-- [x] `Settings()` defaults `s3_path` to `"contract_tests"` when `SENTINEL_S3_PATH` is not set
+- [x] `Config.__init__` reads all values from `os.environ` directly — no third-party config library
+- [x] Required variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET`,
+      `SENTINEL_NAME`) raise `ValueError` at instantiation when absent
+- [x] `Config()` defaults `aws_default_region` to `"us-east-1"` when `AWS_DEFAULT_REGION` is not set
+- [x] `Config()` defaults `aws_endpoint_url` to `None` when `AWS_ENDPOINT_URL` is not set
+- [x] `Config()` defaults `framework` to `"marshmallow"` when `SENTINEL_FRAMEWORK` is not set
+- [x] `Config()` defaults `s3_path` to `"contract_tests"` when `SENTINEL_S3_PATH` is not set
 - [x] `just check` passes
 
 ---
@@ -399,7 +394,7 @@ JSON files to S3, and set up the shared integration test fixture for LocalStack.
 **Type:** Service
 
 **Goal:**
-Implement the adapter factory that maps `Settings` values to concrete adapter instances —
+Implement the adapter factory that maps `Config` values to concrete adapter instances —
 the single place in the codebase that knows which config value means which class, and the single
 place that handles missing optional extras with actionable error messages.
 
@@ -408,23 +403,23 @@ place that handles missing optional extras with actionable error messages.
 - `tests/unit/test_factory.py` — create
 
 **Done when:**
-- [ ] `get_parser(settings)` uses a **lazy import** inside the `if` branch — marshmallow is only
-      imported if `settings.framework == "marshmallow"`, so the factory module itself is safe to
+- [ ] `get_parser(config)` uses a **lazy import** inside the `if` branch — marshmallow is only
+      imported if `config.framework == "marshmallow"`, so the factory module itself is safe to
       import without the extra installed
-- [ ] `get_parser(settings)` returns a `MarshmallowParser` instance when `settings.framework == "marshmallow"`
-- [ ] `get_parser(settings)` raises `MissingDependencyError` (not a bare `ImportError`) with the
+- [ ] `get_parser(config)` returns a `MarshmallowParser` instance when `config.framework == "marshmallow"`
+- [ ] `get_parser(config)` raises `MissingDependencyError` (not a bare `ImportError`) with the
       message `"framework='marshmallow' requires the marshmallow extra.\nInstall it with: pip install contract-sentinel[marshmallow]"`
       when marshmallow is not installed
-- [ ] `get_parser(settings)` raises `UnsupportedFrameworkError` for an unrecognised `framework`
+- [ ] `get_parser(config)` raises `UnsupportedFrameworkError` for an unrecognised `framework`
       value, with a message listing `"marshmallow"` as the valid option
-- [ ] `get_store(settings)` uses a **lazy import** inside the `if` branch — boto3 is only
+- [ ] `get_store(config)` uses a **lazy import** inside the `if` branch — boto3 is only
       imported when the `s3` extra is the active storage backend
-- [ ] `get_store(settings)` returns an `S3ContractStore` instance constructed with
-      `bucket=settings.s3_bucket`, `path=settings.s3_path`, and AWS credentials from `settings`
-- [ ] `get_store(settings)` raises `MissingDependencyError` with the message
+- [ ] `get_store(config)` returns an `S3ContractStore` instance constructed with
+      `bucket=config.s3_bucket`, `path=config.s3_path`, and AWS credentials from `config`
+- [ ] `get_store(config)` raises `MissingDependencyError` with the message
       `"storage backend 's3' requires the s3 extra.\nInstall it with: pip install contract-sentinel[s3]"`
       when boto3 is not installed
-- [ ] `get_store(settings)` raises `UnsupportedStorageError` for an unrecognised storage backend,
+- [ ] `get_store(config)` raises `UnsupportedStorageError` for an unrecognised storage backend,
       with a message listing `"s3"` as the valid option
 - [ ] `just check` passes
 
@@ -445,7 +440,7 @@ running all validation rules, and returning a structured report.
 - `tests/unit/test_validate_service.py` — create
 
 **Done when:**
-- [ ] `validate_contracts(store, parser, loader, settings)` returns a `ValidationReport` dataclass
+- [ ] `validate_contracts(store, parser, loader, config)` returns a `ValidationReport` dataclass
       with `status="PASSED"`, empty `violations`, when producer and consumer schemas are compatible
 - [ ] Returns `status="FAILED"` with the correct `Violation` objects when a breaking rule fires
 - [ ] Each consumer is validated against every producer sharing the same topic — a violation in
@@ -472,7 +467,7 @@ unchanged ones using SHA-256 content hashing.
 - `tests/unit/test_publish_service.py` — create
 
 **Done when:**
-- [ ] `publish_contracts(store, parser, loader, settings)` calls `store.put()` for each
+- [ ] `publish_contracts(store, parser, loader, config)` calls `store.put()` for each
       `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
       S3 object
 - [ ] `store.put()` is **not** called for a schema whose hash matches the current S3 object
@@ -501,7 +496,7 @@ factory adapter construction, and write the integration test against LocalStack.
 - `pyproject.toml` — modify (`uv add typer`; add `[project.scripts] sentinel = "contract_sentinel.cli.main:app"`)
 
 **Done when:**
-- [ ] `Settings()` is constructed **inside** the command handler function, not at module level —
+- [ ] `Config()` is constructed **inside** the command handler function, not at module level —
       importing `contract_sentinel.cli.validate` must not trigger any env var reads
 - [ ] `sentinel validate` runs the full validate flow and prints the violation report to stdout
 - [ ] `sentinel validate` exits with code `1` when at least one violation is found

@@ -3,9 +3,7 @@ name = "contract-sentinel"
 version = "0.1.0"
 description = "Open-source contract testing without a central broker"
 requires-python = ">=3.12"
-dependencies = [
-    "pydantic-settings>=2.13.1",
-]
+dependencies = []
 
 [build-system]
 requires = ["hatchling"]

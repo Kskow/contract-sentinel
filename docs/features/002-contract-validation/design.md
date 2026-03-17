@@ -3,11 +3,11 @@
 ## Architecture Overview
 
 ```
-Config Layer:    Settings (pydantic-settings, env vars) + SentinelConfig (pyproject.toml)
+Config Layer:    Config (plain class, env vars)
 Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule
 Port Layer:      ContractStore (Protocol), SchemaParser (Protocol)
 Adapter Layer:   S3ContractStore, MarshmallowParser
-Factory Layer:   get_parser(config) -> SchemaParser, get_store(config, settings) -> ContractStore
+Factory Layer:   get_parser(config) -> SchemaParser, get_store(config) -> ContractStore
 Service Layer:   validate_contracts(), publish_contracts() use-cases
 CLI Layer:       `sentinel validate`, `sentinel publish` commands
 ```
@@ -28,7 +28,7 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | `S3ContractStore` adapter | `contract_sentinel/adapters/s3_contract_store.py` |
 | `MarshmallowParser` adapter | `contract_sentinel/adapters/marshmallow_parser.py` |
 | Adapter factory | `contract_sentinel/factory.py` |
-| `Settings` (pydantic-settings) | `contract_sentinel/settings.py` |
+| `Config` (plain class, env vars) | `contract_sentinel/config.py` |
 | `SentinelConfig` (tomllib) | `contract_sentinel/config.py` |
 | `validate` CLI command | `contract_sentinel/cli/validate.py` |
 | `publish` CLI command | `contract_sentinel/cli/publish.py` |
@@ -307,14 +307,18 @@ Total Violations: 2
 
 ## 7. Configuration
 
-### `Settings` — env vars (pydantic-settings)
+### `Config` — env vars (plain class)
 
-| Env Var | Type | Required | Default |
-|---|---|---|---|
-| `AWS_ACCESS_KEY_ID` | `str` | Yes | — |
-| `AWS_SECRET_ACCESS_KEY` | `str` | Yes | — |
-| `AWS_DEFAULT_REGION` | `str` | No | `"us-east-1"` |
-| `SENTINEL_REPO_NAME` | `str \| None` | No | `None` |
+| Env Var | Required | Default |
+|---|---|---|
+| `AWS_ACCESS_KEY_ID` | Yes | — |
+| `AWS_SECRET_ACCESS_KEY` | Yes | — |
+| `AWS_DEFAULT_REGION` | No | `"us-east-1"` |
+| `AWS_ENDPOINT_URL` | No | `None` (set for LocalStack) |
+| `S3_BUCKET` | Yes | — |
+| `SENTINEL_S3_PATH` | No | `"contract_tests"` |
+| `SENTINEL_NAME` | Yes | — |
+| `SENTINEL_FRAMEWORK` | No | `"marshmallow"` |
 
 ### `SentinelConfig` — `pyproject.toml` (tomllib + Pydantic `BaseModel`)
 
