@@ -49,7 +49,7 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 
 ## 1. Marker
 
-Class-level decorator. Adds `__contract_sentinel__` to the decorated schema class.
+Class-level decorator. Adds `__contract__` to the decorated schema class.
 
 Arguments:
 * `topic: str` — e.g. `"orders.created"`
@@ -65,7 +65,7 @@ Arguments:
 ## 2. Loader
 
 Import-based scanner. Walks `.py` files under a configured path, imports each module via
-`importlib`, and collects classes that carry `__contract_sentinel__`.
+`importlib`, and collects classes that carry `__contract__`.
 
 Accepts an optional `path` argument to narrow the scan scope.
 

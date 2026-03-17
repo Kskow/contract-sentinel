@@ -25,5 +25,3 @@ class Settings(BaseSettings):
     # Repository Setup
     name: str
     framework: str = "marshmallow"
-    
-    

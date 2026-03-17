@@ -52,8 +52,8 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
 
 ## Acceptance Criteria
 
-1. A class decorated with `@contract_sentinel(topic="orders.created", role=Role.PRODUCER,
-   version="1.0.0")` has a `__contract_sentinel__` attribute containing the correct metadata.
+1. A class decorated with `@contract(topic="orders.created", role=Role.PRODUCER,
+   version="1.0.0")` has a `__contract__` attribute containing the correct metadata.
 
 2. The Loader discovers all marked classes under a configured path and returns their metadata;
    classes without the decorator are ignored.

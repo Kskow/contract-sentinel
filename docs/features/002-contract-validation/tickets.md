@@ -21,7 +21,7 @@ Two external systems are abstracted behind ports:
 ### Data Flow
 
 ```
-User decorates schema class with @contract_sentinel(...)
+User decorates schema class with @contract(...)
          ↓
 sentinel validate / sentinel publish  (CLI entry)
          ↓
@@ -167,7 +167,7 @@ vars for sentinel-specific options. No config files are read at runtime.
 **Type:** Domain
 
 **Goal:**
-Implement the `@contract_sentinel` decorator and `Role` enum that users apply to their schema
+Implement the `@contract` decorator and `Role` enum that users apply to their schema
 classes.
 
 **Files to create / modify:**
@@ -177,11 +177,11 @@ classes.
 
 **Done when:**
 - [ ] `Role` enum has exactly two members: `PRODUCER` and `CONSUMER`
-- [ ] `@contract_sentinel(topic="t", role=Role.PRODUCER, version="1.0.0")` sets
-      `__contract_sentinel__` on the decorated class
-- [ ] `__contract_sentinel__` contains the exact `topic`, `role`, and `version` values
+- [ ] `@contract(topic="t", role=Role.PRODUCER, version="1.0.0")` sets
+      `__contract__` on the decorated class
+- [ ] `__contract__` contains the exact `topic`, `role`, and `version` values
 - [ ] Applying the decorator to a class does not alter any other class attribute
-- [ ] `contract_sentinel/__init__.py` exports `contract_sentinel` and `Role` in `__all__` —
+- [ ] `contract_sentinel/__init__.py` exports `contract` and `Role` in `__all__` —
       these are the only public API symbols users need to import
 - [ ] `just check` passes
 
@@ -294,9 +294,9 @@ Implement the import-based scanner that walks `.py` files and returns all classe
 - `tests/unit/test_loader.py` — create (uses temporary `.py` files via `tmp_path` fixture)
 
 **Done when:**
-- [ ] `load_marked_classes(path)` returns a list of classes whose `__contract_sentinel__`
+- [ ] `load_marked_classes(path)` returns a list of classes whose `__contract__`
       attribute is set, for all `.py` files under `path`
-- [ ] Classes without `__contract_sentinel__` are not included in the result
+- [ ] Classes without `__contract__` are not included in the result
 - [ ] Non-`.py` files under `path` are silently skipped
 - [ ] Classes in nested subdirectories under `path` are discovered
 - [ ] `load_marked_classes` does not raise if a `.py` file fails to import — it logs a warning
