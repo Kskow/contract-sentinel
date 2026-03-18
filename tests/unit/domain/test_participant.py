@@ -1,4 +1,4 @@
-from contract_sentinel.domain.marker import ContractMeta, Role, contract
+from contract_sentinel.domain.participant import ContractMeta, Role, contract
 
 
 class TestContract:

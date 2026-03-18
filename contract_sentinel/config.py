@@ -28,7 +28,6 @@ class Config:
 
         # Repository
         self.name: str = self._require("SENTINEL_NAME")
-        self.framework: str = os.environ.get("SENTINEL_FRAMEWORK", "marshmallow")
 
     @staticmethod
     def _require(key: str) -> str:

@@ -4,7 +4,7 @@ import dataclasses
 from abc import ABC, abstractmethod
 from typing import Any
 
-from contract_sentinel.domain.contract import MISSING, ContractField, UnknownFieldBehaviour
+from contract_sentinel.domain.schema import MISSING, ContractField, UnknownFieldBehaviour
 
 
 @dataclasses.dataclass

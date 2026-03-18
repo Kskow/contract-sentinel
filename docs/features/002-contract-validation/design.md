@@ -4,7 +4,7 @@
 
 ```
 Config Layer:    Config (plain class, env vars)
-Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule
+Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule, Framework / detect_framework
 Port Layer:      ContractStore (Protocol), SchemaParser (Protocol)
 Adapter Layer:   S3ContractStore, MarshmallowParser
 Factory Layer:   get_parser(config) -> SchemaParser, get_store(config) -> ContractStore
@@ -18,10 +18,11 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 
 | Module | File |
 |---|---|
-| Marker decorator + `Role` enum | `contract_sentinel/domain/marker.py` |
+| Marker decorator + `Role` enum | `contract_sentinel/domain/participant.py` |
+| `Framework` enum + `detect_framework` | `contract_sentinel/domain/framework.py` |
 | Loader scanner | `contract_sentinel/domain/loader.py` |
-| `ContractSchema` value object | `contract_sentinel/domain/contract.py` |
-| `Violation` + validation rule ABCs | `contract_sentinel/domain/validation.py` |
+| `ContractSchema` value object | `contract_sentinel/domain/schema.py` |
+| `Violation` + validation rule ABCs | `contract_sentinel/domain/rules.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` port | `contract_sentinel/ports/contract_store.py` |
 | `SchemaParser` port | `contract_sentinel/ports/schema_parser.py` |
@@ -73,6 +74,18 @@ Accepts an optional `path` argument to narrow the scan scope.
 ---
 
 
+## 2a. Framework Detector
+
+Pure introspection — no framework imports required. Inspects class attributes set by the
+framework's own metaclass or base class to determine which adapter to use. MVP supports
+Marshmallow only.
+The service layer calls `detect_framework(cls)` for each discovered class and passes the result
+to `get_parser(framework)`. `config.framework` does not exist — detection is always automatic.
+
+
+---
+
+
 ## 3. Parser
 
 **Port:** `SchemaParser` — `parse(cls: type) -> ContractSchema`
@@ -106,7 +119,7 @@ MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
 }
 ```
 
-> **Canonical `UnknownFieldBehaviour` enum** (defined in `domain/contract.py`):
+> **Canonical `UnknownFieldBehaviour` enum** (defined in `domain/schema.py`):
 >
 > | Enum member | JSON value | Meaning |
 > |---|---|---|
@@ -318,7 +331,7 @@ Total Violations: 2
 | `S3_BUCKET` | Yes | — |
 | `SENTINEL_S3_PATH` | No | `"contract_tests"` |
 | `SENTINEL_NAME` | Yes | — |
-| `SENTINEL_FRAMEWORK` | No | `"marshmallow"` |
+
 
 ### `SentinelConfig` — `pyproject.toml` (tomllib + Pydantic `BaseModel`)
 
@@ -343,7 +356,7 @@ path = "contract_tests"   # optional — defaults to "contract_tests"
 Single module `contract_sentinel/factory.py`. Only place that maps config values to concrete
 adapter types.
 
-### Parser — driven by `framework`
+### Parser — driven by detected framework
 
 | Value | Adapter |
 |---|---|

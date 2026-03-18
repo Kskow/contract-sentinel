@@ -1,5 +1,4 @@
-from contract_sentinel.domain.contract import ContractField, UnknownFieldBehaviour
-from contract_sentinel.domain.validation import (
+from contract_sentinel.domain.rules import (
     MetadataMismatchRule,
     MissingFieldRule,
     NullabilityMismatchRule,
@@ -8,6 +7,7 @@ from contract_sentinel.domain.validation import (
     UndeclaredFieldRule,
     Violation,
 )
+from contract_sentinel.domain.schema import ContractField, UnknownFieldBehaviour
 
 
 class TestViolation:

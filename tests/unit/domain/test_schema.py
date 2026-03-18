@@ -1,4 +1,4 @@
-from contract_sentinel.domain.contract import (
+from contract_sentinel.domain.schema import (
     MISSING,
     ContractField,
     ContractSchema,

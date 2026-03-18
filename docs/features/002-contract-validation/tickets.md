@@ -49,10 +49,11 @@ contract_sentinel/
 ├── factory.py
 ├── domain/
 │   ├── __init__.py
-│   ├── marker.py
+│   ├── participant.py
 │   ├── loader.py
-│   ├── contract.py
-│   ├── validation.py
+│   ├── schema.py
+│   ├── rules.py
+│   ├── framework.py
 │   └── errors.py
 ├── ports/
 │   ├── __init__.py
@@ -75,9 +76,9 @@ contract_sentinel/
 tests/
 ├── unit/
 │   ├── test_config.py
-│   ├── test_marker.py
-│   ├── test_contract.py
-│   ├── test_validation_rules.py
+│   ├── test_participant.py
+│   ├── test_schema.py
+│   ├── test_rules.py
 │   ├── test_loader.py
 │   ├── test_factory.py
 │   ├── test_validate_service.py
@@ -117,7 +118,6 @@ tests/
 | `AWS_DEFAULT_REGION` | `.env` (local), CI env | `"us-east-1"` |
 | `AWS_ENDPOINT_URL` | `.env` (local) | `"http://localhost:4566"` for LocalStack; absent in prod |
 | `SENTINEL_NAME` | `.env` (local), CI env | Repository / project name; required |
-| `SENTINEL_FRAMEWORK` | `.env` (local), CI env | Schema framework; defaults to `"marshmallow"` |
 | `S3_BUCKET` | `.env` (local), CI env | S3 bucket for contract storage; required |
 | `SENTINEL_S3_PATH` | `.env` (local), CI env | S3 key prefix; defaults to `"contract_tests"` |
 
@@ -151,7 +151,6 @@ and `SENTINEL_`-prefixed vars for Sentinel-specific options. No config files are
       `SENTINEL_NAME`) raise `ValueError` at instantiation when absent
 - [x] `Config()` defaults `aws_default_region` to `"us-east-1"` when `AWS_DEFAULT_REGION` is not set
 - [x] `Config()` defaults `aws_endpoint_url` to `None` when `AWS_ENDPOINT_URL` is not set
-- [x] `Config()` defaults `framework` to `"marshmallow"` when `SENTINEL_FRAMEWORK` is not set
 - [x] `Config()` defaults `s3_path` to `"contract_tests"` when `SENTINEL_S3_PATH` is not set
 - [x] `just check` passes
 
@@ -169,8 +168,8 @@ classes.
 
 **Files to create / modify:**
 - `contract_sentinel/domain/__init__.py` — create (empty)
-- `contract_sentinel/domain/marker.py` — create
-- `tests/unit/test_marker.py` — create
+- `contract_sentinel/domain/participant.py` — create
+- `tests/unit/test_participant.py` — create
 
 **Done when:**
 - [x] `Role` enum has exactly two members: `PRODUCER` and `CONSUMER`
@@ -195,12 +194,12 @@ Define the canonical `ContractField` and `ContractSchema` value objects that eve
 exchanges, plus the typed domain errors used by the factory.
 
 **Files to create / modify:**
-- `contract_sentinel/domain/contract.py` — create
+- `contract_sentinel/domain/schema.py` — create
 - `contract_sentinel/domain/errors.py` — create
-- `tests/unit/test_contract.py` — create
+- `tests/unit/test_schema.py` — create
 
 **Done when:**
-- [x] `UnknownFieldBehaviour` is a `str`-based `Enum` in `contract.py` with three members:
+- [x] `UnknownFieldBehaviour` is a `str`-based `Enum` in `schema.py` with three members:
       `FORBID = "forbid"`, `IGNORE = "ignore"`, `ALLOW = "allow"` — these are the only values
       that appear in the canonical JSON format; no Marshmallow constants appear in this file
 - [x] `ContractField` is a dataclass with fields: `name`, `type`, `is_required`, `is_nullable`,
@@ -220,6 +219,30 @@ exchanges, plus the typed domain errors used by the factory.
 
 ---
 
+### TICKET-03a — Domain: Framework Detector
+
+**Depends on:** TICKET-03
+**Type:** Domain
+**Status:** ✅ Done
+
+**Goal:**
+Implement automatic schema framework detection so the service layer never needs a
+`SENTINEL_FRAMEWORK` config value. Detection is pure class inspection — no framework is imported.
+
+**Files to create / modify:**
+- `contract_sentinel/domain/framework.py` — create
+- `tests/unit/domain/test_framework.py` — create
+
+**Done when:**
+- [x] `Framework` is a `StrEnum` in `framework.py` with a single MVP member: `MARSHMALLOW = "marshmallow"`
+- [x] `detect_framework(cls)` returns `Framework.MARSHMALLOW` when `cls` has `_declared_fields`
+- [x] `detect_framework(cls)` raises `UnsupportedFrameworkError` for an unrecognised class,
+      with a message that includes the class name and lists supported frameworks
+- [x] No marshmallow or pydantic import appears anywhere in `detector.py`
+- [x] `just check` passes
+
+---
+
 ### TICKET-04 — Domain: Validation Rules
 
 **Depends on:** TICKET-03
@@ -230,8 +253,8 @@ exchanges, plus the typed domain errors used by the factory.
 Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four MVP rule classes.
 
 **Files to create / modify:**
-- `contract_sentinel/domain/validation.py` — create
-- `tests/unit/test_validation_rules.py` — create
+- `contract_sentinel/domain/rules.py` — create
+- `tests/unit/test_rules.py` — create
 
 **Done when:**
 - [x] `Violation` is a dataclass with fields: `rule`, `severity`, `field_path`, `producer` (dict),
@@ -403,15 +426,15 @@ place that handles missing optional extras with actionable error messages.
 - `tests/unit/test_factory.py` — create
 
 **Done when:**
-- [ ] `get_parser(config)` uses a **lazy import** inside the `if` branch — marshmallow is only
-      imported if `config.framework == "marshmallow"`, so the factory module itself is safe to
-      import without the extra installed
-- [ ] `get_parser(config)` returns a `MarshmallowParser` instance when `config.framework == "marshmallow"`
-- [ ] `get_parser(config)` raises `MissingDependencyError` (not a bare `ImportError`) with the
-      message `"framework='marshmallow' requires the marshmallow extra.\nInstall it with: pip install contract-sentinel[marshmallow]"`
-      when marshmallow is not installed
-- [ ] `get_parser(config)` raises `UnsupportedFrameworkError` for an unrecognised `framework`
-      value, with a message listing `"marshmallow"` as the valid option
+- [ ] `get_parser(framework)` accepts a `Framework` enum value (not a config object)
+- [ ] `get_parser(framework)` uses a **lazy import** inside each branch — the framework adapter
+      is only imported when selected, so the factory module is safe to import without any
+      optional extra installed
+- [ ] `get_parser(framework)` returns a `MarshmallowParser` instance when `framework == Framework.MARSHMALLOW`
+- [ ] `get_parser(framework)` raises `MissingDependencyError` when the required extra for the
+      detected framework is not installed (e.g. marshmallow package missing despite detection)
+- [ ] `get_parser(framework)` raises `UnsupportedFrameworkError` for any `Framework` value that
+      has no registered adapter
 - [ ] `get_store(config)` uses a **lazy import** inside the `if` branch — boto3 is only
       imported when the `s3` extra is the active storage backend
 - [ ] `get_store(config)` returns an `S3ContractStore` instance constructed with
@@ -442,6 +465,8 @@ running all validation rules, and returning a structured report.
 **Done when:**
 - [ ] `validate_contracts(store, parser, loader, config)` returns a `ValidationReport` dataclass
       with `status="PASSED"`, empty `violations`, when producer and consumer schemas are compatible
+- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework
+      before `get_parser(framework)` is invoked
 - [ ] Returns `status="FAILED"` with the correct `Violation` objects when a breaking rule fires
 - [ ] Each consumer is validated against every producer sharing the same topic — a violation in
       any pair sets `status="FAILED"`
@@ -470,6 +495,8 @@ unchanged ones using SHA-256 content hashing.
 - [ ] `publish_contracts(store, parser, loader, config)` calls `store.put()` for each
       `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
       S3 object
+- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework
+      before `get_parser(framework)` is invoked
 - [ ] `store.put()` is **not** called for a schema whose hash matches the current S3 object
 - [ ] `publish_contracts` returns a `PublishReport` with counts of `written` and `skipped` schemas
 - [ ] When a schema does not yet exist in S3 (`store.exists()` returns `False`), it is always

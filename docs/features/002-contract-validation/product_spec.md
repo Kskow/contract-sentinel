@@ -31,8 +31,8 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
   `METADATA_MISMATCH`.
 - Provide a `sentinel validate` CLI command that acts as a PR gate (exits `1` on violations).
 - Provide a `sentinel publish` CLI command that pushes changed contracts to S3 after merge.
-- Read all tool configuration from `[tool.sentinel]` in `pyproject.toml`, with environment
-  variable overrides for secrets.
+- Detect the schema framework automatically from each schema class at runtime — no framework
+  configuration variable required. MVP supports Marshmallow only.
 
 ---
 
@@ -59,26 +59,29 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
 2. The Loader discovers all marked classes under a configured path and returns their metadata;
    classes without the decorator are ignored.
 
-3. A Marshmallow schema is parsed into a `ContractSchema` value object with correct `name`, `type`,
+3. `detect_framework(cls)` returns `Framework.MARSHMALLOW` for a Marshmallow schema class and
+   raises `UnsupportedFrameworkError` for any other class, without importing any framework.
+
+4. A Marshmallow schema is parsed into a `ContractSchema` value object with correct `name`, `type`,
    `is_required`, `is_nullable`, `default`, `metadata`, and nested `fields` for each field.
 
-4. `sentinel publish` writes a canonical JSON contract file to S3 at the path
+5. `sentinel publish` writes a canonical JSON contract file to S3 at the path
    `contract_tests/<topic>/<version>/<role>_<repo>_<class>.json`.
 
-5. `sentinel publish` is idempotent: running it twice on an unchanged schema produces exactly one
+6. `sentinel publish` is idempotent: running it twice on an unchanged schema produces exactly one
    S3 write (on the first run) and zero writes on the second.
 
-6. `sentinel validate` exits `1` and prints a violation report when any breaking rule is triggered
+7. `sentinel validate` exits `1` and prints a violation report when any breaking rule is triggered
    between a producer–consumer pair.
 
-7. `sentinel validate` exits `0` and prints a passing summary when all contracts on all topics are
+8. `sentinel validate` exits `0` and prints a passing summary when all contracts on all topics are
    compatible.
 
-8. `sentinel validate --skip-scan` compares contracts already stored in S3 without scanning or
+9. `sentinel validate --skip-scan` compares contracts already stored in S3 without scanning or
    parsing local files.
 
-9. Supplying `framework = "unsupported"` or `storage.type = "unsupported"` in `pyproject.toml`
-   raises a typed domain error with a message that lists the valid options.
+10. Supplying `framework = "unsupported"` or `storage.type = "unsupported"` in `pyproject.toml`
+    raises a typed domain error with a message that lists the valid options.
 
-10. All configuration is read from `pyproject.toml` and environment variables; no configuration is
+11. All configuration is read from `pyproject.toml` and environment variables; no configuration is
     hardcoded.
