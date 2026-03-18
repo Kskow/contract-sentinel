@@ -8,11 +8,10 @@ if TYPE_CHECKING:
 
 
 class SchemaParser(ABC):
-    """Port for converting a decorated schema class into a canonical ContractSchema.
+    """Abstract parser that converts a decorated schema class into a ContractSchema.
 
-    Each framework adapter (Marshmallow, Pydantic, …) provides its own
-    implementation. The service layer calls this without knowing which
-    framework is in use.
+    Each framework implementation (Marshmallow, Pydantic, …) subclasses this.
+    The service layer calls ``parse`` without knowing which framework is in use.
     """
 
     @abstractmethod

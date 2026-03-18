@@ -57,15 +57,19 @@ contract_sentinel/
 │   ├── schema.py       # ContractField, ContractSchema, UnknownFieldBehaviour
 │   ├── rules.py        # Violation, BinaryRule, ProducerOnlyRule, ConsumerOnlyRule + rule classes
 │   ├── framework.py    # Framework enum + detect_framework
+│   ├── loader.py       # load_marked_classes — filesystem scanner
 │   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
-├── ports/           # Abstract interfaces (Protocol classes)
-├── adapters/        # Concrete implementations of ports
-├── services/        # Use-case orchestration (validate, publish)
-└── cli/             # Typer CLI entrypoints
+├── adapters/           # ABC + implementation(s) per concern
+│   ├── contract_store.py   # ContractStore(ABC) + S3ContractStore
+│   └── schema_parser.py    # SchemaParser(ABC)  + MarshmallowParser (coming soon)
+├── services/           # Use-case orchestration (validate, publish)
+└── cli/                # Typer CLI entrypoints
 
 tests/
-├── unit/        # Pure logic tests — no infra, no I/O mocking
-└── integration/ # Adapter tests — LocalStack / moto / real subprocess
+├── unit/
+│   └── domain/      # Pure logic tests — mirrors contract_sentinel/domain/
+└── integration/
+    └── adapters/    # Adapter tests — LocalStack / moto / real subprocess
 ```
 
 ## Tech Stack

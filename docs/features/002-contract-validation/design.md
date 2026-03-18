@@ -5,9 +5,8 @@
 ```
 Config Layer:    Config (plain class, env vars)
 Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule, Framework / detect_framework
-Port Layer:      ContractStore (Protocol), SchemaParser (Protocol)
-Adapter Layer:   S3ContractStore, MarshmallowParser
-Factory Layer:   get_parser(config) -> SchemaParser, get_store(config) -> ContractStore
+Adapter Layer:   ContractStore(ABC) + S3ContractStore, SchemaParser(ABC) + MarshmallowParser
+Factory Layer:   get_parser(framework) -> SchemaParser, get_store(config) -> ContractStore
 Service Layer:   validate_contracts(), publish_contracts() use-cases
 CLI Layer:       `sentinel validate`, `sentinel publish` commands
 ```
@@ -24,10 +23,8 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | `ContractSchema` value object | `contract_sentinel/domain/schema.py` |
 | `Violation` + validation rule ABCs | `contract_sentinel/domain/rules.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
-| `ContractStore` port | `contract_sentinel/ports/contract_store.py` |
-| `SchemaParser` port | `contract_sentinel/ports/schema_parser.py` |
-| `S3ContractStore` adapter | `contract_sentinel/adapters/s3_contract_store.py` |
-| `MarshmallowParser` adapter | `contract_sentinel/adapters/marshmallow_parser.py` |
+| `ContractStore` ABC + `S3ContractStore` | `contract_sentinel/adapters/contract_store.py` |
+| `SchemaParser` ABC + `MarshmallowParser` | `contract_sentinel/adapters/schema_parser.py` |
 | Adapter factory | `contract_sentinel/factory.py` |
 | `Config` (plain class, env vars) | `contract_sentinel/config.py` |
 | `SentinelConfig` (tomllib) | `contract_sentinel/config.py` |
@@ -38,10 +35,10 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 
 | Layer | Test location | Tooling |
 |---|---|---|
-| `domain/` | `tests/unit/` | Pure pytest, no mocks |
+| `domain/` | `tests/unit/domain/` | Pure pytest, no mocks |
 | `factory.py` | `tests/unit/` | Assert correct type is returned per config value |
-| `adapters/` | `tests/integration/` | LocalStack via Docker Compose |
-| Service use-cases | `tests/unit/` | `unittest.mock.create_autospec` on ports |
+| `adapters/` | `tests/integration/adapters/` | LocalStack via Docker Compose |
+| Service use-cases | `tests/unit/` | `unittest.mock.create_autospec` on adapter ABCs |
 | CLI commands | `tests/integration/` | `typer.testing.CliRunner` + LocalStack |
 
 
@@ -88,7 +85,7 @@ to `get_parser(framework)`. `config.framework` does not exist — detection is a
 
 ## 3. Parser
 
-**Port:** `SchemaParser` — `parse(cls: type) -> ContractSchema`
+**Abstract:** `SchemaParser` — `parse(cls: type) -> ContractSchema`
 
 MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
 
@@ -152,7 +149,7 @@ MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
 
 ## 4. Data Storage
 
-**Port:** `ContractStore` — `get`, `put`, `list`, `exists`
+**Abstract:** `ContractStore` — `get_file`, `put_file`, `list_files`, `file_exists`
 
 MVP adapter: `S3ContractStore`.
 

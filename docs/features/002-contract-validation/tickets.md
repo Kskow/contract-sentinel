@@ -11,12 +11,13 @@
 
 ### Adapter Boundaries
 
-Two external systems are abstracted behind ports:
+Two external systems are abstracted behind ABCs co-located with their implementations:
 
-- **S3** → `ContractStore` port → `S3ContractStore` adapter. Handles all object storage: read,
-  write, list, existence check. The service layer never touches boto3 directly.
-- **Marshmallow** → `SchemaParser` port → `MarshmallowParser` adapter. Converts a schema class
-  into a `ContractSchema` domain object. The service layer never imports marshmallow directly.
+- **S3** → `ContractStore(ABC)` + `S3ContractStore` in `adapters/contract_store.py`. Handles all
+  object storage: read, write, list, existence check. The service layer never touches boto3 directly.
+- **Marshmallow** → `SchemaParser(ABC)` + `MarshmallowParser` in `adapters/schema_parser.py`.
+  Converts a schema class into a `ContractSchema` domain object. The service layer never imports
+  marshmallow directly.
 
 ### Data Flow
 
@@ -55,14 +56,10 @@ contract_sentinel/
 │   ├── rules.py
 │   ├── framework.py
 │   └── errors.py
-├── ports/
-│   ├── __init__.py
-│   ├── contract_store.py
-│   └── schema_parser.py
 ├── adapters/
 │   ├── __init__.py
-│   ├── s3_contract_store.py
-│   └── marshmallow_parser.py
+│   ├── contract_store.py      ← ContractStore(ABC) + S3ContractStore
+│   └── schema_parser.py       ← SchemaParser(ABC) + MarshmallowParser
 ├── services/
 │   ├── __init__.py
 │   ├── validate.py
@@ -74,19 +71,23 @@ contract_sentinel/
     └── publish.py
 
 tests/
+├── conftest.py                ← clean_sys_modules fixture (suite-wide)
 ├── unit/
+│   └── domain/
+│       ├── test_participant.py
+│       ├── test_schema.py
+│       ├── test_rules.py
+│       ├── test_loader.py
+│       └── test_framework.py
 │   ├── test_config.py
-│   ├── test_participant.py
-│   ├── test_schema.py
-│   ├── test_rules.py
-│   ├── test_loader.py
 │   ├── test_factory.py
 │   ├── test_validate_service.py
 │   └── test_publish_service.py
 └── integration/
-    ├── conftest.py            ← S3 bucket fixture (created in TICKET-08)
-    ├── test_marshmallow_parser.py
-    ├── test_s3_contract_store.py
+    ├── conftest.py            ← s3_client, s3_bucket, s3_store fixtures
+    ├── adapters/
+    │   ├── test_contract_store.py
+    │   └── test_schema_parser.py
     ├── test_cli_validate.py
     └── test_cli_publish.py
 ```
@@ -307,6 +308,7 @@ dependencies.
 
 **Depends on:** TICKET-02
 **Type:** Domain
+**Status: ✅ Done**
 
 **Goal:**
 Implement the import-based scanner that walks `.py` files and returns all classes marked with
@@ -314,17 +316,21 @@ Implement the import-based scanner that walks `.py` files and returns all classe
 
 **Files to create / modify:**
 - `contract_sentinel/domain/loader.py` — create
-- `tests/unit/test_loader.py` — create (uses temporary `.py` files via `tmp_path` fixture)
+- `tests/unit/domain/test_loader.py` — create (uses temporary `.py` files via `tmp_path` fixture)
+- `tests/conftest.py` — create (`clean_sys_modules` fixture, shared across the suite)
 
 **Done when:**
-- [ ] `load_marked_classes(path)` returns a list of classes whose `__contract__`
+- [x] `load_marked_classes(path)` returns a list of classes whose `__contract__`
       attribute is set, for all `.py` files under `path`
-- [ ] Classes without `__contract__` are not included in the result
-- [ ] Non-`.py` files under `path` are silently skipped
-- [ ] Classes in nested subdirectories under `path` are discovered
-- [ ] `load_marked_classes` does not raise if a `.py` file fails to import — it logs a warning
-      and continues
-- [ ] `just check` passes
+- [x] Classes without `__contract__` are not included in the result
+- [x] Non-`.py` files under `path` are silently skipped
+- [x] Classes in nested subdirectories under `path` are discovered
+- [x] `load_marked_classes` uses a retry loop — files that fail due to unresolved
+      cross-file imports are retried each pass until no further progress is made,
+      handling dependencies regardless of alphabetical ordering
+- [x] `load_marked_classes` does not raise if a `.py` file fails to import — it logs a
+      `WARNING` with the full message and file path after all retries are exhausted
+- [x] `just check` passes
 
 ---
 
@@ -379,36 +385,35 @@ schema class into a `ContractSchema`.
 
 **Depends on:** TICKET-01, TICKET-05
 **Type:** Adapter
+**Status: ✅ Done**
 
 **Goal:**
 Implement `S3ContractStore`, the concrete `ContractStore` adapter that reads and writes contract
 JSON files to S3, and set up the shared integration test fixture for LocalStack.
 
-**Files to create / modify:**
-- `contract_sentinel/adapters/s3_contract_store.py` — create
-- `tests/integration/conftest.py` — create (S3 client + bucket fixture, reused by CLI tests)
-- `tests/integration/test_s3_contract_store.py` — create
-- `pyproject.toml` — modify (add `boto3` as optional extra via `uv add --optional s3 boto3`;
-  also add `boto3>=1.0` to the `all` extra created in TICKET-07)
+**Files created / modified:**
+- `contract_sentinel/adapters/contract_store.py` — `ContractStore(ABC)` + `S3ContractStore` (co-located, mirrors `rules.py` pattern)
+- `contract_sentinel/adapters/schema_parser.py` — `SchemaParser(ABC)` (implementation added in TICKET-07)
+- `tests/integration/conftest.py` — `s3_client`, `s3_bucket`, `s3_store` fixtures; reused by CLI tests
+- `tests/integration/adapters/test_contract_store.py` — integration tests against LocalStack
+- `pyproject.toml` — `boto3` as optional `s3` extra; `boto3` + `boto3-stubs[s3]` in dev group
 
 **Done when:**
-- [ ] `boto3` is listed under `[project.optional-dependencies]` in `pyproject.toml`,
+- [x] `boto3` is listed under `[project.optional-dependencies]` in `pyproject.toml`,
       not under `[project.dependencies]`
-- [ ] `s3_contract_store.py` does **not** import boto3 at the top level — the import lives
+- [x] `contract_store.py` does **not** import boto3 at the top level — the import lives
       inside `__init__` so that the module loads safely without the extra installed
-- [ ] `S3ContractStore` satisfies the `ContractStore` Protocol (type-checker must agree)
-- [ ] `S3ContractStore` is constructed with a `path` argument (the `storage.path` config value)
-      and prepends it to every S3 key — no S3 path segment is hardcoded inside the adapter
-- [ ] `put(key, content)` writes `content` as a UTF-8 string to the correct S3 key
-- [ ] `get(key)` returns the exact string previously written by `put`
-- [ ] `exists(key)` returns `True` after a `put` and `False` for a key that was never written
-- [ ] `list(prefix)` returns all keys sharing the prefix, ordered by `LastModified` descending
-      (most recently written first)
-- [ ] `list(prefix)` returns `[]` when no keys match the prefix
-- [ ] Integration test: `put` → `get` → `exists` → `list` sequence asserts all of the above
-      against a real LocalStack S3 bucket created by the `conftest.py` fixture
-- [ ] `conftest.py` creates the test bucket before each test and deletes all objects after
-- [ ] `just check` passes
+- [x] `S3ContractStore` extends `ContractStore` ABC (type-checker agrees)
+- [x] `S3ContractStore` is constructed with a `path` argument and prepends it to every
+      S3 key — callers always work with relative keys; no path is hardcoded inside the adapter
+- [x] `put_file(key, content)` writes `content` as a UTF-8 string to the correct S3 key
+- [x] `get_file(key)` returns the exact string previously written by `put_file`
+- [x] `file_exists(key)` returns `True` after a `put_file` and `False` for a key never written
+- [x] `list_files(prefix)` returns all keys sharing the prefix, ordered by `LastModified` descending;
+      returns `[]` when no keys match
+- [x] `conftest.py` creates a unique test bucket before each test and deletes all objects after;
+      `s3_store` fixture wires a ready-to-use store to the test bucket
+- [x] `just check` passes
 
 ---
 
