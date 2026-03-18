@@ -1,38 +1,10 @@
-from contract_sentinel.domain.rules import (
+from contract_sentinel.domain.rules.binary_rule import (
     MetadataMismatchRule,
-    MissingFieldRule,
     NullabilityMismatchRule,
     RequirementMismatchRule,
     TypeMismatchRule,
-    UndeclaredFieldRule,
-    Violation,
 )
-from contract_sentinel.domain.schema import ContractField, UnknownFieldBehaviour
-
-
-class TestViolation:
-    def test_to_dict_serialises_all_fields(self) -> None:
-        violation = Violation(
-            rule="TYPE_MISMATCH",
-            severity="CRITICAL",
-            field_path="order_id",
-            producer={"type": "string"},
-            consumer={"type": "integer"},
-            message=(
-                "Field 'order_id' is a 'string' in Producer but Consumer expects a 'integer'."
-            ),
-        )
-
-        assert violation.to_dict() == {
-            "rule": "TYPE_MISMATCH",
-            "severity": "CRITICAL",
-            "field_path": "order_id",
-            "producer": {"type": "string"},
-            "consumer": {"type": "integer"},
-            "message": (
-                "Field 'order_id' is a 'string' in Producer but Consumer expects a 'integer'."
-            ),
-        }
+from contract_sentinel.domain.schema import ContractField
 
 
 class TestTypeMismatchRule:
@@ -115,60 +87,6 @@ class TestNullabilityMismatchRule:
         field = ContractField(name="field", type="string", is_required=True, is_nullable=False)
 
         assert NullabilityMismatchRule().check(field, field) == []
-
-
-class TestMissingFieldRule:
-    def test_returns_violation_when_producer_field_absent_and_consumer_required(self) -> None:
-        consumer = ContractField(name="field", type="string", is_required=True, is_nullable=False)
-
-        violations = MissingFieldRule().check(consumer)
-
-        assert len(violations) == 1
-        assert violations[0].to_dict() == {
-            "rule": "MISSING_FIELD",
-            "severity": "CRITICAL",
-            "field_path": "field",
-            "producer": {"exists": False},
-            "consumer": {"is_required": True},
-            "message": "Field 'field' is missing in Producer but required in Consumer.",
-        }
-
-    def test_returns_empty_when_consumer_has_default(self) -> None:
-        consumer = ContractField(
-            name="field", type="string", is_required=True, is_nullable=False, default="fallback"
-        )
-
-        assert MissingFieldRule().check(consumer) == []
-
-
-class TestUndeclaredFieldRule:
-    def test_returns_violation_when_consumer_forbids_unknowns(self) -> None:
-        producer = ContractField(name="extra", type="string", is_required=True, is_nullable=False)
-
-        violations = UndeclaredFieldRule(UnknownFieldBehaviour.FORBID).check(producer)
-
-        assert len(violations) == 1
-        assert violations[0].to_dict() == {
-            "rule": "UNDECLARED_FIELD",
-            "severity": "CRITICAL",
-            "field_path": "extra",
-            "producer": {"exists": True},
-            "consumer": {"exists": False, "unknown": "forbid"},
-            "message": (
-                "Field 'extra' is sent by Producer but is not declared"
-                " in Consumer (unknown=forbid)."
-            ),
-        }
-
-    def test_returns_empty_when_consumer_ignores_unknowns(self) -> None:
-        producer = ContractField(name="extra", type="string", is_required=True, is_nullable=False)
-
-        assert UndeclaredFieldRule(UnknownFieldBehaviour.IGNORE).check(producer) == []
-
-    def test_returns_empty_when_consumer_allows_unknowns(self) -> None:
-        producer = ContractField(name="extra", type="string", is_required=True, is_nullable=False)
-
-        assert UndeclaredFieldRule(UnknownFieldBehaviour.ALLOW).check(producer) == []
 
 
 class TestMetadataMismatchRule:

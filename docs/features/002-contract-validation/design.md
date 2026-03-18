@@ -21,7 +21,10 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | `Framework` enum + `detect_framework` | `contract_sentinel/domain/framework.py` |
 | Loader scanner | `contract_sentinel/domain/loader.py` |
 | `ContractSchema` value object | `contract_sentinel/domain/schema.py` |
-| `Violation` + validation rule ABCs | `contract_sentinel/domain/rules.py` |
+| `Violation` | `contract_sentinel/domain/rules/violation.py` |
+| `BinaryRule` + concrete binary rules | `contract_sentinel/domain/rules/binary_rule.py` |
+| `ProducerOnlyRule` + `UndeclaredFieldRule` | `contract_sentinel/domain/rules/producer_only_rule.py` |
+| `ConsumerOnlyRule` + `MissingFieldRule` | `contract_sentinel/domain/rules/consumer_only_rule.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` ABC + `S3ContractStore` | `contract_sentinel/adapters/contract_store.py` |
 | `SchemaParser` ABC + `MarshmallowParser` | `contract_sentinel/adapters/schema_parser.py` |

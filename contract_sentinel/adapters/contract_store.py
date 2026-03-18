@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
 from http import HTTPStatus
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
@@ -97,7 +97,7 @@ class S3ContractStore(ContractStore):
             self._client.head_object(Bucket=self._bucket, Key=self._full_key(key))
             return True
         except self._client_error as exc:
-            if exc.response["Error"]["Code"] == HTTPStatus.NOT_FOUND.value:  # type: ignore[attr-defined]
+            if exc.response["Error"]["Code"] == str(HTTPStatus.NOT_FOUND.value):  # type: ignore[attr-defined]
                 return False
             raise
 

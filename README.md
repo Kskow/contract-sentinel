@@ -55,7 +55,11 @@ contract_sentinel/
 ├── domain/             # Pure business logic — no I/O, no infra imports
 │   ├── participant.py  # @contract decorator, Role enum, ContractMeta
 │   ├── schema.py       # ContractField, ContractSchema, UnknownFieldBehaviour
-│   ├── rules.py        # Violation, BinaryRule, ProducerOnlyRule, ConsumerOnlyRule + rule classes
+│   ├── rules/          # Violation, BinaryRule, ProducerOnlyRule, ConsumerOnlyRule + rule classes
+│   │   ├── violation.py
+│   │   ├── binary_rule.py
+│   │   ├── producer_only_rule.py
+│   │   └── consumer_only_rule.py
 │   ├── framework.py    # Framework enum + detect_framework
 │   ├── loader.py       # load_marked_classes — filesystem scanner
 │   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError

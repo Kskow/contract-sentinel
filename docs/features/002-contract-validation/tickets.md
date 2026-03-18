@@ -53,7 +53,11 @@ contract_sentinel/
 │   ├── participant.py
 │   ├── loader.py
 │   ├── schema.py
-│   ├── rules.py
+│   ├── rules/
+│   │   ├── violation.py
+│   │   ├── binary_rule.py
+│   │   ├── producer_only_rule.py
+│   │   └── consumer_only_rule.py
 │   ├── framework.py
 │   └── errors.py
 ├── adapters/
@@ -76,7 +80,11 @@ tests/
 │   └── domain/
 │       ├── test_participant.py
 │       ├── test_schema.py
-│       ├── test_rules.py
+│       ├── rules/
+│       │   ├── test_violation.py
+│       │   ├── test_binary_rule.py
+│       │   ├── test_producer_only_rule.py
+│       │   └── test_consumer_only_rule.py
 │       ├── test_loader.py
 │       └── test_framework.py
 │   ├── test_config.py
@@ -254,8 +262,8 @@ Implement automatic schema framework detection so the service layer never needs 
 Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four MVP rule classes.
 
 **Files to create / modify:**
-- `contract_sentinel/domain/rules.py` — create
-- `tests/unit/test_rules.py` — create
+- `contract_sentinel/domain/rules/` — create as package (`violation.py`, `binary_rule.py`, `producer_only_rule.py`, `consumer_only_rule.py`)
+- `tests/unit/domain/rules/` — create as package (`test_violation.py`, `test_binary_rule.py`, `test_producer_only_rule.py`, `test_consumer_only_rule.py`)
 
 **Done when:**
 - [x] `Violation` is a dataclass with fields: `rule`, `severity`, `field_path`, `producer` (dict),
