@@ -75,6 +75,13 @@ version = "0.1.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
+all = [
+    { name = "boto3" },
+    { name = "marshmallow" },
+]
+marshmallow = [
+    { name = "marshmallow" },
+]
 s3 = [
     { name = "boto3" },
 ]
@@ -83,6 +90,7 @@ s3 = [
 dev = [
     { name = "boto3" },
     { name = "boto3-stubs", extra = ["s3"] },
+    { name = "marshmallow" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
@@ -91,13 +99,19 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "boto3", marker = "extra == 's3'", specifier = ">=1.42.70" }]
-provides-extras = ["s3"]
+requires-dist = [
+    { name = "boto3", marker = "extra == 'all'", specifier = ">=1.42.70" },
+    { name = "boto3", marker = "extra == 's3'", specifier = ">=1.42.70" },
+    { name = "marshmallow", marker = "extra == 'all'", specifier = ">=3.13,<4.0" },
+    { name = "marshmallow", marker = "extra == 'marshmallow'", specifier = ">=3.13,<4.0" },
+]
+provides-extras = ["s3", "marshmallow", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "boto3", specifier = ">=1.42.70" },
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.42.70" },
+    { name = "marshmallow", specifier = ">=3.13,<4.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-cov", specifier = ">=5.0" },
     { name = "pytest-xdist", specifier = ">=3.0" },
@@ -214,6 +228,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d3/59/322338183ecda247fb5d1763a6cbe46eff7222eaeebafd9fa65d4bf5cb11/jmespath-1.1.0.tar.gz", hash = "sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d", size = 27377, upload-time = "2026-01-22T16:35:26.279Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl", hash = "sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64", size = 20419, upload-time = "2026-01-22T16:35:24.919Z" },
+]
+
+[[package]]
+name = "marshmallow"
+version = "3.26.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/55/79/de6c16cc902f4fc372236926b0ce2ab7845268dcc30fb2fbb7f71b418631/marshmallow-3.26.2.tar.gz", hash = "sha256:bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57", size = 222095, upload-time = "2025-12-22T06:53:53.309Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl", hash = "sha256:013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73", size = 50964, upload-time = "2025-12-22T06:53:51.801Z" },
 ]
 
 [[package]]

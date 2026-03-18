@@ -15,7 +15,7 @@ Two external systems are abstracted behind ABCs co-located with their implementa
 
 - **S3** → `ContractStore(ABC)` + `S3ContractStore` in `adapters/contract_store.py`. Handles all
   object storage: read, write, list, existence check. The service layer never touches boto3 directly.
-- **Marshmallow** → `SchemaParser(ABC)` + `MarshmallowParser` in `adapters/schema_parser.py`.
+- **Marshmallow** → `SchemaParser(ABC)` + `Marshmallow3Parser` in `adapters/schema_parser.py`.
   Converts a schema class into a `ContractSchema` domain object. The service layer never imports
   marshmallow directly.
 
@@ -63,7 +63,7 @@ contract_sentinel/
 ├── adapters/
 │   ├── __init__.py
 │   ├── contract_store.py      ← ContractStore(ABC) + S3ContractStore
-│   └── schema_parser.py       ← SchemaParser(ABC) + MarshmallowParser
+│   └── schema_parser.py       ← SchemaParser(ABC) + Marshmallow3Parser
 ├── services/
 │   ├── __init__.py
 │   ├── validate.py
@@ -212,10 +212,12 @@ exchanges, plus the typed domain errors used by the factory.
       `FORBID = "forbid"`, `IGNORE = "ignore"`, `ALLOW = "allow"` — these are the only values
       that appear in the canonical JSON format; no Marshmallow constants appear in this file
 - [x] `ContractField` is a dataclass with fields: `name`, `type`, `is_required`, `is_nullable`,
-      `default` (uses `MISSING` sentinel when absent — distinct from `default=None`),
-      `fields` (optional list of `ContractField`), `metadata` (optional `dict[str, Any]` for
-      type-specific extras), `unknown` (`UnknownFieldBehaviour | None` — only populated when
-      `type == "object"`, carries the nested schema's own policy)
+      `format` (optional `str` — JSON Schema format string refining `type`; omitted from
+      serialised JSON when `None`), `default` (uses `MISSING` sentinel when absent — distinct from
+      `default=None`), `fields` (optional list of `ContractField`), `metadata` (optional
+      `dict[str, Any]` for type-specific extras), `unknown` (`UnknownFieldBehaviour | None` —
+      only populated when `type == "object"`, carries the nested schema's own policy), `values`
+      (optional sequence of allowed enum member values — populated only for enum fields)
 - [x] `ContractSchema` is a dataclass with fields: `topic`, `role`, `version`, `repository`,
       `class_name`, `unknown` (`UnknownFieldBehaviour`), `fields` (list of `ContractField`) —
       no default values; always constructed with explicit arguments
@@ -283,6 +285,11 @@ Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four
       `IGNORE` or `ALLOW`
 - [x] `MetadataMismatchRule(BinaryRule)` returns one `CRITICAL` `Violation` per consumer-declared
       metadata key that differs from the producer (including keys absent from producer metadata)
+- [x] `EnumValuesMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when the producer
+      can emit an enum value (`values` list) that is not present in the consumer's `values` list;
+      skipped when either side has no `values` (field may not be enum or parser didn't capture values)
+- [x] `TypeMismatchRule` compares `format` in addition to `type` — a mismatch in either field
+      triggers a violation; the `format` key is included in the violation payload only when present
 - [x] `just check` passes
 
 ---
@@ -342,50 +349,46 @@ Implement the import-based scanner that walks `.py` files and returns all classe
 
 ---
 
-### TICKET-07 — Adapter: MarshmallowParser
+### TICKET-07 — Adapter: Marshmallow3Parser
 
 **Depends on:** TICKET-03, TICKET-05
 **Type:** Adapter
+**Status: ✅ Done**
 
 **Goal:**
-Implement `MarshmallowParser`, the concrete `SchemaParser` adapter that converts a Marshmallow
-schema class into a `ContractSchema`.
+Implement `Marshmallow3Parser`, the concrete `SchemaParser` adapter that converts a Marshmallow 3
+schema class into a `ContractSchema`. Co-located with `SchemaParser(ABC)` in `schema_parser.py`.
 
-**Files to create / modify:**
-- `contract_sentinel/adapters/__init__.py` — create (empty)
-- `contract_sentinel/adapters/marshmallow_parser.py` — create
-- `tests/integration/test_marshmallow_parser.py` — create
-- `pyproject.toml` — modify (add `marshmallow` as optional extra via
-  `uv add --optional marshmallow marshmallow`; also add convenience
-  `all = ["marshmallow>=3.0", "boto3>=1.0"]` extra under `[project.optional-dependencies]`)
+**Files created / modified:**
+- `contract_sentinel/adapters/schema_parser.py` — `SchemaParser(ABC)` + `Marshmallow3Parser` (co-located)
+- `tests/integration/adapters/test_schema_parser.py` — integration tests
+- `pyproject.toml` — `marshmallow>=3.13,<4.0` as optional `marshmallow` extra; `all` extra bundles both `s3` and `marshmallow`
 
 **Done when:**
-- [ ] `marshmallow` is listed under `[project.optional-dependencies]` in `pyproject.toml`,
+- [x] `marshmallow` is listed under `[project.optional-dependencies]` in `pyproject.toml`,
       not under `[project.dependencies]`
-- [ ] `marshmallow_parser.py` does **not** import marshmallow at the top level — the import
-      lives inside the class methods so that the module loads safely without the extra installed
-- [ ] `MarshmallowParser` satisfies the `SchemaParser` Protocol (type-checker must agree)
-- [ ] `parse(cls)` maps Marshmallow field types to canonical strings: `fields.String` → `"string"`,
-      `fields.Integer` → `"integer"`, `fields.Boolean` → `"boolean"`, `fields.List` → `"list"`,
-      `fields.Dict` → `"dict"`, nested `Schema` → `"object"`
-- [ ] `parse(cls)` correctly sets `required=True` for fields with no default and `allow_none=False`
-- [ ] `parse(cls)` correctly captures `default` when a marshmallow field has one
-- [ ] `parse(cls)` populates `fields` recursively for a nested `Schema` field
-- [ ] `parse(cls)` reads the top-level schema's effective unknown-field policy from the instantiated
-      schema's `_meta.unknown` attribute (not from `class Meta` directly — inheritance must be
-      respected) and maps it to `UnknownFieldBehaviour`: `marshmallow.RAISE → FORBID`,
-      `marshmallow.EXCLUDE → IGNORE`, `marshmallow.INCLUDE → ALLOW`; defaults to `FORBID` when
-      unset. The strings `"RAISE"`, `"EXCLUDE"`, `"INCLUDE"` must not appear outside this file.
-- [ ] `parse(cls)` sets `ContractField.unknown` for any field whose `type == "object"` by applying
-      the same mapping to that nested schema's `_meta.unknown`; leaves `None` for all other types
-- [ ] Integration test: a Marshmallow schema defined inline in the test is parsed and the resulting
-      `ContractSchema.fields` list matches the expected structure exactly
-- [ ] Integration test: a schema with `class Meta: unknown = EXCLUDE` produces
-      `ContractSchema.unknown == UnknownFieldBehaviour.IGNORE`
-- [ ] Integration test: a schema with a nested schema carrying `class Meta: unknown = INCLUDE`
-      produces the corresponding `ContractField.unknown == UnknownFieldBehaviour.ALLOW` on the
-      object field
-- [ ] `just check` passes
+- [x] `Marshmallow3Parser` does **not** import marshmallow at the top level — the import
+      lives inside `__init__` so that the module loads safely without the extra installed
+- [x] `Marshmallow3Parser` extends `SchemaParser` ABC (type-checker agrees)
+- [x] `parse(cls)` maps Marshmallow field types to canonical types and JSON Schema formats:
+      `String` → `"string"`, `Integer` → `"integer"`, `Float`/`Decimal`/`TimeDelta` → `"number"`,
+      `Boolean` → `"boolean"`, `List`/`Tuple` → `"array"`, `Dict`/`Mapping` → `"object"`,
+      nested `Schema`/`Nested`/`Pluck` → `"object"`; datetime subtypes, email, URL, UUID, and IP
+      variants carry a `format` string; unknown field types fall back to `("string", classname.lower())`
+- [x] `parse(cls)` correctly sets `is_required` and `is_nullable` from `field.required` and `field.allow_none`
+- [x] `parse(cls)` correctly captures `default` when a marshmallow field has one (`load_default`)
+- [x] `parse(cls)` populates `fields` recursively for nested `Schema` fields
+- [x] `parse(cls)` reads the effective unknown-field policy from `schema_instance.unknown`
+      (not from `class Meta` directly — Marshmallow resolves this through MRO, so inheritance
+      is handled correctly) and maps it to `UnknownFieldBehaviour`: `marshmallow.RAISE → FORBID`,
+      `marshmallow.EXCLUDE → IGNORE`, `marshmallow.INCLUDE → ALLOW`; defaults to `FORBID`
+- [x] `parse(cls)` sets `ContractField.unknown` for any field whose `type == "object"` by applying
+      the same mapping to that nested schema's `unknown`; leaves `None` for all other types
+- [x] `parse(cls)` captures `values` for `Enum` fields — the ordered list of member `.value`s
+- [x] Integration tests cover: full field-to-dict round trip, all unknown-field policies,
+      policy inheritance through schema MRO, nested schemas, `Pluck`, all field type mappings,
+      and enum `values` capture
+- [x] `just check` passes
 
 ---
 

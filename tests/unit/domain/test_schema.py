@@ -9,42 +9,52 @@ from contract_sentinel.domain.schema import (
 class TestContractField:
     def test_init_stores_all_fields_correctly(self) -> None:
         field = ContractField(
-            name="email",
-            type="str",
+            name="status",
+            type="string",
+            format="enum",
             is_required=True,
             is_nullable=False,
-            default="user@example.com",
+            default="active",
+            fields=None,
+            metadata={"deprecated": True},
             unknown=UnknownFieldBehaviour.IGNORE,
+            values=["active", "inactive"],
         )
 
-        assert field.to_dict() == {
-            "name": "email",
-            "type": "str",
+        expected = {
+            "name": "status",
+            "type": "string",
+            "format": "enum",
             "is_required": True,
             "is_nullable": False,
-            "default": "user@example.com",
+            "default": "active",
+            "metadata": {"deprecated": True},
             "unknown": "ignore",
+            "values": ["active", "inactive"],
         }
+        assert field.to_dict() == expected
+        assert ContractField.from_dict(expected) == field
 
-    def test_init_sets_missing_default_when_not_provided(self) -> None:
-        field = ContractField(name="age", type="int", is_required=False, is_nullable=False)
+    def test_to_dict_omits_optional_keys_when_unset(self) -> None:
+        field = ContractField(name="age", type="integer", is_required=False, is_nullable=False)
 
+        assert field.to_dict() == {
+            "name": "age",
+            "type": "integer",
+            "is_required": False,
+            "is_nullable": False,
+        }
         assert field.default is MISSING
-
-    def test_to_dict_omits_default_when_missing(self) -> None:
-        field = ContractField(name="age", type="int", is_required=False, is_nullable=False)
-
-        assert "default" not in field.to_dict()
 
     def test_to_dict_includes_default_null_when_none(self) -> None:
         field = ContractField(
-            name="age", type="int", is_required=False, is_nullable=True, default=None
+            name="age", type="integer", is_required=False, is_nullable=True, default=None
         )
 
         assert field.to_dict()["default"] is None
 
     def test_to_dict_serialises_nested_fields_recursively(self) -> None:
-        child = ContractField(name="street", type="str", is_required=True, is_nullable=False)
+        child = ContractField(name="street", type="string", is_required=True, is_nullable=False)
         parent = ContractField(
             name="address",
             type="object",
@@ -55,8 +65,8 @@ class TestContractField:
 
         assert parent.to_dict()["fields"] == [child.to_dict()]
 
-    def test_from_dict_deserialises_nested_fields_recursively(self) -> None:
-        child = ContractField(name="street", type="str", is_required=True, is_nullable=False)
+    def test_from_dict_round_trip_with_nested_fields(self) -> None:
+        child = ContractField(name="street", type="string", is_required=True, is_nullable=False)
         parent = ContractField(
             name="address",
             type="object",
@@ -65,45 +75,7 @@ class TestContractField:
             fields=[child],
         )
 
-        assert ContractField.from_dict(parent.to_dict()).fields == [child]
-
-    def test_round_trip_preserves_equality_without_default(self) -> None:
-        field = ContractField(
-            name="count",
-            type="int",
-            is_required=True,
-            is_nullable=False,
-            unknown=UnknownFieldBehaviour.IGNORE,
-        )
-
-        assert ContractField.from_dict(field.to_dict()) == field
-
-    def test_to_dict_includes_metadata_when_present(self) -> None:
-        field = ContractField(
-            name="created_at",
-            type="datetime",
-            is_required=True,
-            is_nullable=False,
-            metadata={"format": "iso8601", "timezone": "utc"},
-        )
-
-        assert field.to_dict()["metadata"] == {"format": "iso8601", "timezone": "utc"}
-
-    def test_to_dict_omits_metadata_when_none(self) -> None:
-        field = ContractField(name="age", type="int", is_required=True, is_nullable=False)
-
-        assert "metadata" not in field.to_dict()
-
-    def test_round_trip_preserves_metadata(self) -> None:
-        field = ContractField(
-            name="price",
-            type="decimal",
-            is_required=True,
-            is_nullable=False,
-            metadata={"places": 2, "rounding": "ROUND_HALF_UP"},
-        )
-
-        assert ContractField.from_dict(field.to_dict()) == field
+        assert ContractField.from_dict(parent.to_dict()) == parent
 
     def test_round_trip_preserves_equality_with_default_none(self) -> None:
         field = ContractField(

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import dataclasses
 from enum import StrEnum
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class UnknownFieldBehaviour(StrEnum):
@@ -27,21 +30,26 @@ MISSING: Final[object] = object()
 class ContractField:
     """Canonical representation of a single field in a contract schema.
 
+    `format` refines `type` with a JSON-Schema-compatible format string.
+    Omitted from serialised JSON when None.
     `default` uses the MISSING sentinel when the field has no default value —
     in that case the key is omitted from the serialised JSON entirely.
     `fields` is populated only when type == "object" (nested schema).
     `unknown` is populated only when type == "object", carrying the nested
     schema's own unknown-field policy.
+    `values` is populated only for enum fields; holds the set of allowed values.
     """
 
     name: str
     type: str
     is_required: bool
     is_nullable: bool
+    format: str | None = None
     default: object = dataclasses.field(default=MISSING)
     fields: list[ContractField] | None = None
     metadata: dict[str, Any] | None = None
     unknown: UnknownFieldBehaviour | None = None
+    values: Sequence[str | int | float] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -50,6 +58,8 @@ class ContractField:
             "is_required": self.is_required,
             "is_nullable": self.is_nullable,
         }
+        if self.format is not None:
+            result["format"] = self.format
         if self.default is not MISSING:
             result["default"] = self.default
         if self.fields is not None:
@@ -58,6 +68,8 @@ class ContractField:
             result["metadata"] = self.metadata
         if self.unknown is not None:
             result["unknown"] = self.unknown.value
+        if self.values is not None:
+            result["values"] = self.values
         return result
 
     @classmethod
@@ -68,6 +80,8 @@ class ContractField:
             "is_required": data["is_required"],
             "is_nullable": data["is_nullable"],
         }
+        if "format" in data:
+            kwargs["format"] = data["format"]
         if "default" in data:
             kwargs["default"] = data["default"]
         if "fields" in data:
@@ -76,6 +90,8 @@ class ContractField:
             kwargs["metadata"] = data["metadata"]
         if "unknown" in data:
             kwargs["unknown"] = UnknownFieldBehaviour(data["unknown"])
+        if "values" in data:
+            kwargs["values"] = data["values"]
         return cls(**kwargs)
 
 

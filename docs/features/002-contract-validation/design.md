@@ -5,7 +5,7 @@
 ```
 Config Layer:    Config (plain class, env vars)
 Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule, Framework / detect_framework
-Adapter Layer:   ContractStore(ABC) + S3ContractStore, SchemaParser(ABC) + MarshmallowParser
+Adapter Layer:   ContractStore(ABC) + S3ContractStore, SchemaParser(ABC) + Marshmallow3Parser
 Factory Layer:   get_parser(framework) -> SchemaParser, get_store(config) -> ContractStore
 Service Layer:   validate_contracts(), publish_contracts() use-cases
 CLI Layer:       `sentinel validate`, `sentinel publish` commands
@@ -27,7 +27,7 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | `ConsumerOnlyRule` + `MissingFieldRule` | `contract_sentinel/domain/rules/consumer_only_rule.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` ABC + `S3ContractStore` | `contract_sentinel/adapters/contract_store.py` |
-| `SchemaParser` ABC + `MarshmallowParser` | `contract_sentinel/adapters/schema_parser.py` |
+| `SchemaParser` ABC + `Marshmallow3Parser` | `contract_sentinel/adapters/schema_parser.py` |
 | Adapter factory | `contract_sentinel/factory.py` |
 | `Config` (plain class, env vars) | `contract_sentinel/config.py` |
 | `SentinelConfig` (tomllib) | `contract_sentinel/config.py` |
@@ -40,7 +40,7 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 |---|---|---|
 | `domain/` | `tests/unit/domain/` | Pure pytest, no mocks |
 | `factory.py` | `tests/unit/` | Assert correct type is returned per config value |
-| `adapters/` | `tests/integration/adapters/` | LocalStack via Docker Compose |
+| `adapters/` | `tests/integration/adapters/` | Real external dependency (`S3ContractStore` → LocalStack; `Marshmallow3Parser` → marshmallow library) |
 | Service use-cases | `tests/unit/` | `unittest.mock.create_autospec` on adapter ABCs |
 | CLI commands | `tests/integration/` | `typer.testing.CliRunner` + LocalStack |
 
@@ -90,20 +90,22 @@ to `get_parser(framework)`. `config.framework` does not exist — detection is a
 
 **Abstract:** `SchemaParser` — `parse(cls: type) -> ContractSchema`
 
-MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
+MVP adapter: `Marshmallow3Parser`. Interface is framework-agnostic.
 
 ### Canonical Field Format
 
 | Property | Description |
 |---|---|
 | `name` | Field name as declared |
-| `type` | `"string"`, `"integer"`, `"boolean"`, `"list"`, `"dict"`, `"object"` |
+| `type` | `"string"`, `"integer"`, `"number"`, `"boolean"`, `"array"`, `"object"` |
+| `format` | JSON Schema format string refining `type` (e.g. `"date-time"`, `"email"`, `"uuid"`, `"enum"`); omitted when absent |
 | `is_required` | `true` if the field has no default |
 | `is_nullable` | Whether `null` is a valid value |
-| `metadata` | Optional dict of type-specific extras (e.g. `{"format": "iso8601"}`); omitted when absent |
 | `default` | Default value, or absent if none |
-| `fields` | Nested field list — present when `type` is `"object"` or `"list[object]"` |
+| `fields` | Nested field list — present when `type` is `"object"` |
 | `unknown` | Framework-agnostic unknown-field policy — `"forbid"`, `"ignore"`, or `"allow"`; present only when `type` is `"object"`, representing the nested schema's own policy |
+| `values` | Ordered list of allowed enum member values — present only when `format` is `"enum"`; omitted otherwise |
+| `metadata` | Optional dict of type-specific extras (e.g. `{"format": "iso8601"}`); omitted when absent |
 
 ### Contract Envelope
 
@@ -136,13 +138,13 @@ MVP adapter: `MarshmallowParser`. Interface is framework-agnostic.
 > | `marshmallow.EXCLUDE` | `UnknownFieldBehaviour.IGNORE` |
 > | `marshmallow.INCLUDE` | `UnknownFieldBehaviour.ALLOW` |
 >
-> `MarshmallowParser` is the only module that imports or references `marshmallow.RAISE` /
+> `Marshmallow3Parser` is the only module that imports or references `marshmallow.RAISE` /
 > `marshmallow.EXCLUDE` / `marshmallow.INCLUDE`. The mapping lives entirely inside
-> `adapters/marshmallow_parser.py`.
+> `adapters/schema_parser.py`.
 >
-> **`unknown` resolution:** The parser must read the effective value from the instantiated schema's
-> `_meta.unknown` attribute — not directly from `class Meta`. Marshmallow resolves this through MRO,
-> so reading `_meta.unknown` correctly handles inheritance. The default when unset is `FORBID`.
+> **`unknown` resolution:** The parser reads the effective value from the instantiated schema's
+> `unknown` attribute — not directly from `class Meta`. Marshmallow resolves this through MRO,
+> so reading `schema_instance.unknown` correctly handles inheritance. The default when unset is `FORBID`.
 
 `field_path` uses dot notation for nested fields (e.g. `"metadata.discount_code"`, `"items[].sku"`).
 
@@ -206,12 +208,13 @@ The service layer dispatches to the right group based on field presence — no r
 
 | Rule | Trigger | Severity |
 |---|---|---|
-| `TYPE_MISMATCH` | Type differs between producer and consumer | CRITICAL |
+| `TYPE_MISMATCH` | Type or format differs between producer and consumer | CRITICAL |
 | `REQUIREMENT_MISMATCH` | Producer optional, consumer required (no default) | CRITICAL |
 | `NULLABILITY_MISMATCH` | Producer allows `null`, consumer does not | CRITICAL |
 | `MISSING_FIELD` | Field absent from producer, required by consumer (no default) | CRITICAL |
 | `UNDECLARED_FIELD` | Producer has a field not declared in consumer schema and consumer `unknown == "forbid"` | CRITICAL |
 | `METADATA_MISMATCH` | A metadata key declared by consumer differs from (or is absent in) producer | CRITICAL |
+| `ENUM_VALUES_MISMATCH` | Producer can emit an enum value the consumer does not accept | CRITICAL |
 
 > **`UNDECLARED_FIELD` directionality:** The unknown-field policy only applies during `load()`
 > (deserialization), which is what the **consumer** does. The producer serializes (`dump()`) its
@@ -360,7 +363,7 @@ adapter types.
 
 | Value | Adapter |
 |---|---|
-| `"marshmallow"` | `MarshmallowParser` |
+| `"marshmallow"` | `Marshmallow3Parser` |
 | other | `UnsupportedFrameworkError` |
 
 ### Store — driven by `storage.type`

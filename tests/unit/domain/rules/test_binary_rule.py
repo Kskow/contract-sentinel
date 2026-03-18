@@ -1,4 +1,5 @@
 from contract_sentinel.domain.rules.binary_rule import (
+    EnumValuesMismatchRule,
     MetadataMismatchRule,
     NullabilityMismatchRule,
     RequirementMismatchRule,
@@ -28,6 +29,49 @@ class TestTypeMismatchRule:
         field = ContractField(name="field", type="string", is_required=True, is_nullable=False)
 
         assert TypeMismatchRule().check(field, field) == []
+
+    def test_returns_violation_when_formats_differ_same_type(self) -> None:
+        producer = ContractField(
+            name="ip_addr", type="string", format="ipv4", is_required=True, is_nullable=False
+        )
+        consumer = ContractField(
+            name="ip_addr", type="string", format="ipv6", is_required=True, is_nullable=False
+        )
+
+        violations = TypeMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "TYPE_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "ip_addr",
+            "producer": {"type": "string", "format": "ipv4"},
+            "consumer": {"type": "string", "format": "ipv6"},
+            "message": (
+                "Field 'ip_addr' is a 'string (ipv4)' in Producer"
+                " but Consumer expects a 'string (ipv6)'."
+            ),
+        }
+
+    def test_returns_empty_when_type_and_format_both_match(self) -> None:
+        field = ContractField(
+            name="created_at",
+            type="string",
+            format="date-time",
+            is_required=True,
+            is_nullable=False,
+        )
+
+        assert TypeMismatchRule().check(field, field) == []
+
+    def test_violation_payload_omits_format_when_none(self) -> None:
+        producer = ContractField(name="f", type="string", is_required=True, is_nullable=False)
+        consumer = ContractField(name="f", type="integer", is_required=True, is_nullable=False)
+
+        violation = TypeMismatchRule().check(producer, consumer)[0]
+
+        assert "format" not in violation.to_dict()["producer"]
+        assert "format" not in violation.to_dict()["consumer"]
 
 
 class TestRequirementMismatchRule:
@@ -228,3 +272,57 @@ class TestMetadataMismatchRule:
         )
 
         assert MetadataMismatchRule().check(producer, consumer) == []
+
+
+class TestEnumValuesMismatchRule:
+    def _field(self, values: list[str] | None) -> ContractField:
+        return ContractField(
+            name="status",
+            type="string",
+            format="enum",
+            is_required=True,
+            is_nullable=False,
+            values=values,
+        )
+
+    def test_returns_violation_when_producer_emits_value_consumer_cannot_accept(self) -> None:
+        producer = self._field(["active", "inactive", "deleted"])
+        consumer = self._field(["active", "inactive"])
+
+        violations = EnumValuesMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "ENUM_VALUES_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "status",
+            "producer": {"values": ["active", "inactive", "deleted"]},
+            "consumer": {"values": ["active", "inactive"]},
+            "message": (
+                "Field 'status' producer can emit ['deleted']"
+                " but Consumer does not accept those values."
+            ),
+        }
+
+    def test_returns_empty_when_producer_values_subset_of_consumer(self) -> None:
+        producer = self._field(["active", "inactive"])
+        consumer = self._field(["active", "inactive", "pending"])
+
+        assert EnumValuesMismatchRule().check(producer, consumer) == []
+
+    def test_returns_empty_when_values_are_equal(self) -> None:
+        field = self._field(["active", "inactive"])
+
+        assert EnumValuesMismatchRule().check(field, field) == []
+
+    def test_returns_empty_when_producer_values_is_none(self) -> None:
+        producer = self._field(None)
+        consumer = self._field(["active"])
+
+        assert EnumValuesMismatchRule().check(producer, consumer) == []
+
+    def test_returns_empty_when_consumer_values_is_none(self) -> None:
+        producer = self._field(["active"])
+        consumer = self._field(None)
+
+        assert EnumValuesMismatchRule().check(producer, consumer) == []

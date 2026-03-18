@@ -65,7 +65,7 @@ contract_sentinel/
 │   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
 ├── adapters/           # ABC + implementation(s) per concern
 │   ├── contract_store.py   # ContractStore(ABC) + S3ContractStore
-│   └── schema_parser.py    # SchemaParser(ABC)  + MarshmallowParser (coming soon)
+│   └── schema_parser.py    # SchemaParser(ABC)  + Marshmallow3Parser
 ├── services/           # Use-case orchestration (validate, publish)
 └── cli/                # Typer CLI entrypoints
 
