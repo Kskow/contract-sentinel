@@ -21,10 +21,11 @@ class Config:
         self.aws_secret_access_key: str = self._require("AWS_SECRET_ACCESS_KEY")
         self.aws_default_region: str = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
         self.aws_endpoint_url: str | None = os.environ.get("AWS_ENDPOINT_URL")  # LocalStack Testing
+        self.s3_bucket: str = self._require("S3_BUCKET")
 
         # Storage
-        self.s3_bucket: str = self._require("S3_BUCKET")
         self.s3_path: str = os.environ.get("SENTINEL_S3_PATH", "contract_tests")
+        self.storage_backend: str = os.environ.get("SENTINEL_STORAGE_BACKEND", "s3").lower()
 
         # Repository
         self.name: str = self._require("SENTINEL_NAME")

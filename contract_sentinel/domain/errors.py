@@ -7,7 +7,7 @@ class UnsupportedStorageError(Exception):
 
 
 class MissingDependencyError(Exception):
-    def __init__(self, package: str) -> None:
-        super().__init__(
-            f"Required package '{package}' is not installed. Install it with: pip install {package}"
-        )
+    """Raised when an optional extra is required but not installed."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)

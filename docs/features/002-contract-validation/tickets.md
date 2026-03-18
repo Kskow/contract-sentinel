@@ -432,6 +432,7 @@ JSON files to S3, and set up the shared integration test fixture for LocalStack.
 
 **Depends on:** TICKET-01, TICKET-03, TICKET-07, TICKET-08
 **Type:** Service
+**Status: ✅ Done**
 
 **Goal:**
 Implement the adapter factory that maps `Config` values to concrete adapter instances —
@@ -443,25 +444,31 @@ place that handles missing optional extras with actionable error messages.
 - `tests/unit/test_factory.py` — create
 
 **Done when:**
-- [ ] `get_parser(framework)` accepts a `Framework` enum value (not a config object)
-- [ ] `get_parser(framework)` uses a **lazy import** inside each branch — the framework adapter
-      is only imported when selected, so the factory module is safe to import without any
-      optional extra installed
-- [ ] `get_parser(framework)` returns a `MarshmallowParser` instance when `framework == Framework.MARSHMALLOW`
-- [ ] `get_parser(framework)` raises `MissingDependencyError` when the required extra for the
-      detected framework is not installed (e.g. marshmallow package missing despite detection)
-- [ ] `get_parser(framework)` raises `UnsupportedFrameworkError` for any `Framework` value that
-      has no registered adapter
-- [ ] `get_store(config)` uses a **lazy import** inside the `if` branch — boto3 is only
+- [x] `get_parser(framework, repository)` accepts a `Framework` enum value and a `repository`
+      string (not a config object) — repository is threaded separately so parser factory stays
+      independent from storage config
+- [x] `get_parser(framework, repository)` uses a **lazy import** inside each branch — the
+      framework adapter is only imported when selected, so the factory module is safe to import
+      without any optional extra installed
+- [x] `get_parser(framework, repository)` returns a `Marshmallow3Parser` instance when
+      `framework == Framework.MARSHMALLOW`
+- [x] `get_parser(framework, repository)` raises `MissingDependencyError` when the required
+      extra for the detected framework is not installed (e.g. marshmallow package missing)
+- [x] `get_parser(framework, repository)` raises `UnsupportedFrameworkError` for any `Framework`
+      value that has no registered adapter
+- [x] `get_store(config)` uses a **lazy import** inside the `match` branch — boto3 is only
       imported when the `s3` extra is the active storage backend
-- [ ] `get_store(config)` returns an `S3ContractStore` instance constructed with
+- [x] `get_store(config)` returns an `S3ContractStore` instance constructed with
       `bucket=config.s3_bucket`, `path=config.s3_path`, and AWS credentials from `config`
-- [ ] `get_store(config)` raises `MissingDependencyError` with the message
+- [x] `get_store(config)` raises `MissingDependencyError` with the message
       `"storage backend 's3' requires the s3 extra.\nInstall it with: pip install contract-sentinel[s3]"`
       when boto3 is not installed
-- [ ] `get_store(config)` raises `UnsupportedStorageError` for an unrecognised storage backend,
+- [x] `get_store(config)` raises `UnsupportedStorageError` for an unrecognised storage backend,
       with a message listing `"s3"` as the valid option
-- [ ] `just check` passes
+- [x] `Config` gained a `storage_backend` field (reads `SENTINEL_STORAGE_BACKEND`, defaults to
+      `"s3"`) so the factory can route and the `UnsupportedStorageError` branch is testable
+- [x] `MissingDependencyError` updated to accept a plain `message: str` for full flexibility
+- [x] `just check` passes
 
 ---
 
