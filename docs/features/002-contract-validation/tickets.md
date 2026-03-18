@@ -282,9 +282,10 @@ Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four
 
 **Depends on:** TICKET-03
 **Type:** Port
+**Status: ✅ Done**
 
 **Goal:**
-Define the two `Protocol` interfaces that decouple the service layer from all cloud and framework
+Define the two `ABC` interfaces that decouple the service layer from all cloud and framework
 dependencies.
 
 **Files to create / modify:**
@@ -293,12 +294,12 @@ dependencies.
 - `contract_sentinel/ports/schema_parser.py` — create
 
 **Done when:**
-- [ ] `ContractStore` is a `Protocol` with methods: `get(key: str) -> str`,
-      `put(key: str, content: str) -> None`, `list(prefix: str) -> list[str]`,
-      `exists(key: str) -> bool`
-- [ ] `SchemaParser` is a `Protocol` with method `parse(cls: type) -> ContractSchema`
-- [ ] Both protocols are importable from `contract_sentinel.ports`
-- [ ] `just check` passes
+- [x] `ContractStore` is an `ABC` with methods: `get_file(key: str) -> str`,
+      `put_file(key: str, content: str) -> None`, `list_files(prefix: str) -> list[str]`,
+      `file_exists(key: str) -> bool`
+- [x] `SchemaParser` is an `ABC` with method `parse(cls: type) -> ContractSchema`
+- [x] Both ABCs are importable from their respective modules under `contract_sentinel.ports`
+- [x] `just check` passes
 
 ---
 
