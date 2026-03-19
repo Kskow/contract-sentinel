@@ -22,18 +22,15 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | Loader scanner | `contract_sentinel/domain/loader.py` |
 | `ContractSchema` value object | `contract_sentinel/domain/schema.py` |
 | `Violation` | `contract_sentinel/domain/rules/violation.py` |
-| `BinaryRule(ABC)` | `contract_sentinel/domain/rules/binary_rule/base.py` |
-| `TypeMismatchRule` | `contract_sentinel/domain/rules/binary_rule/type_mismatch.py` |
-| `NullabilityMismatchRule` | `contract_sentinel/domain/rules/binary_rule/nullability_mismatch.py` |
-| `RequirementMismatchRule` | `contract_sentinel/domain/rules/binary_rule/requirement_mismatch.py` |
-| `DirectionMismatchRule` | `contract_sentinel/domain/rules/binary_rule/direction_mismatch.py` |
-| `MetadataMismatchRule` | `contract_sentinel/domain/rules/binary_rule/metadata_mismatch.py` |
-| `AllowedValuesValidator` | `contract_sentinel/domain/rules/binary_rule/allowed_values_validator.py` |
-| `RangeConstraintRule` | `contract_sentinel/domain/rules/binary_rule/range_constraint.py` |
-| `LengthConstraintRule` | `contract_sentinel/domain/rules/binary_rule/length_constraint.py` |
-| `MissingFieldRule` | `contract_sentinel/domain/rules/binary_rule/missing_field.py` |
-| `UndeclaredFieldRule` | `contract_sentinel/domain/rules/binary_rule/undeclared_field.py` |
-| `NestedFieldRule` | `contract_sentinel/domain/rules/binary_rule/nested_field.py` |
+| `Rule(ABC)` | `contract_sentinel/domain/rules/rule.py` |
+| `TypeMismatchRule` | `contract_sentinel/domain/rules/type_mismatch.py` |
+| `NullabilityMismatchRule` | `contract_sentinel/domain/rules/nullability_mismatch.py` |
+| `RequirementMismatchRule` | `contract_sentinel/domain/rules/requirement_mismatch.py` |
+| `DirectionMismatchRule` | `contract_sentinel/domain/rules/direction_mismatch.py` |
+| `MetadataMismatchRule` | `contract_sentinel/domain/rules/metadata_mismatch.py` |
+| `MissingFieldRule` | `contract_sentinel/domain/rules/missing_field.py` |
+| `UndeclaredFieldRule` | `contract_sentinel/domain/rules/undeclared_field.py` |
+| `NestedFieldRule` | `contract_sentinel/domain/rules/nested_field.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` ABC + `S3ContractStore` | `contract_sentinel/adapters/contract_store.py` |
 | `SchemaParser` ABC + `Marshmallow3Parser` | `contract_sentinel/adapters/schema_parser.py` |
@@ -205,7 +202,7 @@ Each consumer is validated against every producer on the same topic. Any failing
 
 Directional validation: "can the consumer safely consume what this producer sends?"
 
-A single `BinaryRule(ABC)` covers all rule types. Its signature is:
+A single `Rule(ABC)` covers all rule types. Its signature is:
 
 ```python
 def check(self, producer: ContractField | None, consumer: ContractField | None) -> list[Violation]
@@ -229,10 +226,10 @@ Each rule self-determines its behaviour based on which side is `None`:
 | `NULLABILITY_MISMATCH` | Producer allows `null`, consumer does not | CRITICAL |
 | `MISSING_FIELD` | Field absent from producer (`producer is None`), required by consumer (no default) | CRITICAL |
 | `UNDECLARED_FIELD` | Producer has a field not declared in consumer schema and consumer `unknown == "forbid"` | CRITICAL |
-| `METADATA_MISMATCH` | A metadata key declared by consumer differs from (or is absent in) producer | CRITICAL |
-| `ALLOWED_VALUES_MISMATCH` | Producer can emit a value the consumer does not accept; also fires when producer is unconstrained but consumer is constrained | CRITICAL |
-| `RANGE_CONSTRAINT_MISMATCH` | Producer's numeric range is wider than the consumer's (min/max, inclusive boundaries) | CRITICAL |
-| `LENGTH_CONSTRAINT_MISMATCH` | Producer's string/array length range is wider than the consumer's | CRITICAL |
+| `METADATA_KEY_MISMATCH` | A generic metadata key declared by consumer differs from (or is absent in) producer | CRITICAL |
+| `METADATA_ALLOWED_VALUES_MISMATCH` | Producer can emit a value the consumer does not accept; also fires when producer is unconstrained but consumer is constrained | CRITICAL |
+| `METADATA_RANGE_MISMATCH` | Producer's numeric range is wider than the consumer's (min/max, inclusive boundaries) | CRITICAL |
+| `METADATA_LENGTH_MISMATCH` | Producer's string/array length range is wider than the consumer's | CRITICAL |
 | `DIRECTION_MISMATCH` | Field is `load_only` in producer (never serialised) but consumer expects to receive it | CRITICAL |
 
 > **`UNDECLARED_FIELD` directionality:** The unknown-field policy only applies during `load()`

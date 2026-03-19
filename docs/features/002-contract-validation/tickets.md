@@ -54,20 +54,16 @@ contract_sentinel/
 │   ├── loader.py
 │   ├── schema.py
 │   ├── rules/
+│   │   ├── rule.py               ← Rule(ABC)
 │   │   ├── violation.py
-│   │   └── binary_rule/          ← BinaryRule(ABC) + all rule modules
-│   │       ├── base.py
-│   │       ├── type_mismatch.py
-│   │       ├── nullability_mismatch.py
-│   │       ├── requirement_mismatch.py
-│   │       ├── direction_mismatch.py
-│   │       ├── metadata_mismatch.py
-│   │       ├── allowed_values_validator.py
-│   │       ├── range_constraint.py
-│   │       ├── length_constraint.py
-│   │       ├── missing_field.py
-│   │       ├── undeclared_field.py
-│   │       └── nested_field.py
+│   │   ├── type_mismatch.py
+│   │   ├── nullability_mismatch.py
+│   │   ├── requirement_mismatch.py
+│   │   ├── direction_mismatch.py
+│   │   ├── metadata_mismatch.py  ← allowed_values, range, length + generic key checks
+│   │   ├── missing_field.py
+│   │   ├── undeclared_field.py
+│   │   └── nested_field.py
 │   ├── framework.py
 │   └── errors.py
 ├── adapters/
@@ -92,18 +88,14 @@ tests/
 │       ├── test_schema.py
 │       ├── rules/
 │       │   ├── test_violation.py
-│       │   └── binary_rule/
-│       │       ├── test_type_mismatch.py
-│       │       ├── test_nullability_mismatch.py
-│       │       ├── test_requirement_mismatch.py
-│       │       ├── test_direction_mismatch.py
-│       │       ├── test_metadata_mismatch.py
-│       │       ├── test_allowed_values_validator.py
-│       │       ├── test_range_constraint.py
-│       │       ├── test_length_constraint.py
-│       │       ├── test_missing_field.py
-│       │       ├── test_undeclared_field.py
-│       │       └── test_nested_field.py
+│       │   ├── test_type_mismatch.py
+│       │   ├── test_nullability_mismatch.py
+│       │   ├── test_requirement_mismatch.py
+│       │   ├── test_direction_mismatch.py
+│       │   ├── test_metadata_mismatch.py  ← covers allowed_values, range, length + generic key
+│       │   ├── test_missing_field.py
+│       │   ├── test_undeclared_field.py
+│       │   └── test_nested_field.py
 │       ├── test_loader.py
 │       └── test_framework.py
 │   ├── test_config.py
@@ -280,18 +272,19 @@ Implement automatic schema framework detection so the service layer never needs 
 **Status: ✅ Done**
 
 **Goal:**
-Implement the `Violation` dataclass, the single `BinaryRule` ABC, and all rule classes.
+Implement the `Violation` dataclass, the single `Rule` ABC, and all rule classes.
 
 **Files created:**
 - `contract_sentinel/domain/rules/violation.py`
-- `contract_sentinel/domain/rules/binary_rule/` — one module per rule class
+- `contract_sentinel/domain/rules/rule.py` — `Rule(ABC)`
+- `contract_sentinel/domain/rules/` — one module per rule class
 - `tests/unit/domain/rules/test_violation.py`
-- `tests/unit/domain/rules/binary_rule/` — one test module per rule class
+- `tests/unit/domain/rules/` — one test module per rule class
 
 **Done when:**
 - [x] `Violation` is a dataclass with fields: `rule`, `severity`, `field_path`, `producer` (dict),
       `consumer` (dict), `message`; exposes `to_dict() -> dict[str, Any]`
-- [x] Single `BinaryRule(ABC)` in `binary_rule/base.py` with signature
+- [x] Single `Rule(ABC)` in `rules/rule.py` with signature
       `check(producer: ContractField | None, consumer: ContractField | None) -> list[Violation]`.
       Rules self-determine behaviour based on which side is `None` — no separate
       `ProducerOnlyRule` or `ConsumerOnlyRule` ABCs exist
@@ -306,18 +299,14 @@ Implement the `Violation` dataclass, the single `BinaryRule` ABC, and all rule c
 - [x] `UndeclaredFieldRule` returns a `CRITICAL` violation when `consumer.unknown == FORBID`;
       `consumer` is the *parent* container object (not a matched field) — its `.unknown` policy
       determines whether the absence is a violation; returns `[]` for `IGNORE`, `ALLOW`, or unset
-- [x] `MetadataMismatchRule` returns one `CRITICAL` violation per consumer-declared metadata key
-      that differs from the producer; skips keys handled by dedicated rules (`allowed_values`,
-      `range`, `length`); returns `[]` when either side is `None`
-- [x] `AllowedValuesValidator` returns a `CRITICAL` violation (`ALLOWED_VALUES_MISMATCH`) when
-      the producer can emit a value the consumer does not accept; also fires when the producer has
-      no `allowed_values` constraint but the consumer does; returns `[]` when either side is `None`
-- [x] `RangeConstraintRule` returns `CRITICAL` violations when the producer's numeric range is
-      wider than the consumer's (checked for both min and max bounds, including inclusivity);
-      returns `[]` when either side is `None`
-- [x] `LengthConstraintRule` returns `CRITICAL` violations when the producer's string/array length
-      range is wider than the consumer's; supports `min`, `max`, and `equal` constraints;
-      returns `[]` when either side is `None`
+- [x] `MetadataMismatchRule` is the single entry-point for all metadata validation. It dispatches
+      on the metadata key: `allowed_values` → `METADATA_ALLOWED_VALUES_MISMATCH` (fires when the
+      producer can emit a value the consumer does not accept, or when the producer is unconstrained
+      but the consumer is); `range` → `METADATA_RANGE_MISMATCH` (fires when the producer's numeric
+      range is wider than the consumer's, including inclusivity boundaries); `length` →
+      `METADATA_LENGTH_MISMATCH` (fires when the producer's string/array length range is wider,
+      supporting `min`, `max`, and `equal` constraints); all other keys → `METADATA_KEY_MISMATCH`
+      (simple equality check). Returns `[]` when either side is `None`
 - [x] `DirectionMismatchRule` returns a `CRITICAL` violation when a field is `load_only` in the
       producer (never serialised) but the consumer expects to receive it; returns `[]` when either
       side is `None`

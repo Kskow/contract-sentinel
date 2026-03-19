@@ -56,20 +56,16 @@ contract_sentinel/
 │   ├── participant.py  # @contract decorator, Role enum, ContractMeta
 │   ├── schema.py       # ContractField, ContractSchema, UnknownFieldBehaviour
 │   ├── rules/
+│   │   ├── rule.py               # Rule(ABC) — check(producer | None, consumer | None)
 │   │   ├── violation.py          # Violation dataclass
-│   │   └── binary_rule/          # BinaryRule(ABC) + all rule classes
-│   │       ├── base.py           # BinaryRule — check(producer | None, consumer | None)
-│   │       ├── type_mismatch.py
-│   │       ├── nullability_mismatch.py
-│   │       ├── requirement_mismatch.py
-│   │       ├── direction_mismatch.py
-│   │       ├── metadata_mismatch.py
-│   │       ├── allowed_values_validator.py
-│   │       ├── range_constraint.py
-│   │       ├── length_constraint.py
-│   │       ├── missing_field.py  # fires when producer is None
-│   │       ├── undeclared_field.py  # fires when consumer.unknown == FORBID
-│   │       └── nested_field.py   # recursive sub-field validation
+│   │   ├── type_mismatch.py
+│   │   ├── nullability_mismatch.py
+│   │   ├── requirement_mismatch.py
+│   │   ├── direction_mismatch.py
+│   │   ├── metadata_mismatch.py  # allowed_values, range, length + generic key checks
+│   │   ├── missing_field.py      # fires when producer is None
+│   │   ├── undeclared_field.py   # fires when consumer.unknown == FORBID
+│   │   └── nested_field.py       # recursive sub-field validation
 │   ├── framework.py    # Framework enum + detect_framework
 │   ├── loader.py       # load_marked_classes — filesystem scanner
 │   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
