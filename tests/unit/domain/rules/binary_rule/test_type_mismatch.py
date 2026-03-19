@@ -1,0 +1,31 @@
+from contract_sentinel.domain.rules.binary_rule import TypeMismatchRule
+from tests.unit.domain.rules.binary_rule.helpers import field
+
+
+class TestTypeMismatchRule:
+    def test_returns_violation_when_types_differ(self) -> None:
+        producer = field(type="string")
+        consumer = field(type="integer")
+
+        violations = TypeMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "TYPE_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"type": "string"},
+            "consumer": {"type": "integer"},
+            "message": "Field 'field' is a 'string' in Producer but Consumer expects a 'integer'.",
+        }
+
+    def test_returns_empty_when_types_match(self) -> None:
+        f = field(type="string")
+
+        assert TypeMismatchRule().check(f, f) == []
+
+    def test_returns_empty_when_both_are_objects(self) -> None:
+        # Object-level type match; sub-field differences handled by NestedFieldRule.
+        f = field(type="object")
+
+        assert TypeMismatchRule().check(f, f) == []

@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Final
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from typing import Any
 
 
 class UnknownFieldBehaviour(StrEnum):
@@ -21,35 +18,39 @@ class UnknownFieldBehaviour(StrEnum):
     ALLOW = "allow"
 
 
-# Sentinel for a field that carries no default value.
-# Absent from the serialised JSON; distinct from default=None.
-MISSING: Final[object] = object()
-
-
 @dataclasses.dataclass
 class ContractField:
     """Canonical representation of a single field in a contract schema.
 
-    `format` refines `type` with a JSON-Schema-compatible format string.
-    Omitted from serialised JSON when None.
-    `default` uses the MISSING sentinel when the field has no default value —
-    in that case the key is omitted from the serialised JSON entirely.
-    `fields` is populated only when type == "object" (nested schema).
-    `unknown` is populated only when type == "object", carrying the nested
-    schema's own unknown-field policy.
-    `values` is populated only for enum fields; holds the set of allowed values.
+    Core fields (always present, always breaking on mismatch):
+        name           — wire name (data_key if set, otherwise attribute name).
+        type           — JSON Schema type string.
+        is_required    — field must be present in the payload.
+        is_nullable    — field may be null.
+        is_load_only   — field only appears during deserialization (consumer → producer).
+        is_dump_only   — field only appears during serialization (producer → consumer).
+
+    Structural fields (typed, require their own rule semantics):
+        fields   — populated for type "object" or "array" of objects (nested schema).
+        unknown  — populated for type "object", carrying the nested schema's unknown-field policy.
+
+    Soft constraints (compared via MetadataMismatchRule):
+        metadata — arbitrary dict of type-specific extras injected by the parser
+                   (e.g. format, custom_format, values, load_default, dump_default,
+                   length, range, pattern, allowed_values, item_type).
+                   Omitted from serialised JSON when None.
     """
 
     name: str
     type: str
     is_required: bool
     is_nullable: bool
-    format: str | None = None
-    default: object = dataclasses.field(default=MISSING)
+    is_load_only: bool = False
+    is_dump_only: bool = False
+    is_supported: bool = True
     fields: list[ContractField] | None = None
-    metadata: dict[str, Any] | None = None
     unknown: UnknownFieldBehaviour | None = None
-    values: Sequence[str | int | float] | None = None
+    metadata: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -58,18 +59,17 @@ class ContractField:
             "is_required": self.is_required,
             "is_nullable": self.is_nullable,
         }
-        if self.format is not None:
-            result["format"] = self.format
-        if self.default is not MISSING:
-            result["default"] = self.default
+        if self.is_load_only:
+            result["is_load_only"] = self.is_load_only
+        if self.is_dump_only:
+            result["is_dump_only"] = self.is_dump_only
+        result["is_supported"] = self.is_supported
         if self.fields is not None:
             result["fields"] = [f.to_dict() for f in self.fields]
-        if self.metadata is not None:
-            result["metadata"] = self.metadata
         if self.unknown is not None:
             result["unknown"] = self.unknown.value
-        if self.values is not None:
-            result["values"] = self.values
+        if self.metadata is not None:
+            result["metadata"] = self.metadata
         return result
 
     @classmethod
@@ -79,19 +79,16 @@ class ContractField:
             "type": data["type"],
             "is_required": data["is_required"],
             "is_nullable": data["is_nullable"],
+            "is_load_only": data.get("is_load_only", False),
+            "is_dump_only": data.get("is_dump_only", False),
+            "is_supported": data.get("is_supported", True),
         }
-        if "format" in data:
-            kwargs["format"] = data["format"]
-        if "default" in data:
-            kwargs["default"] = data["default"]
         if "fields" in data:
             kwargs["fields"] = [cls.from_dict(f) for f in data["fields"]]
-        if "metadata" in data:
-            kwargs["metadata"] = data["metadata"]
         if "unknown" in data:
             kwargs["unknown"] = UnknownFieldBehaviour(data["unknown"])
-        if "values" in data:
-            kwargs["values"] = data["values"]
+        if "metadata" in data:
+            kwargs["metadata"] = data["metadata"]
         return cls(**kwargs)
 
 

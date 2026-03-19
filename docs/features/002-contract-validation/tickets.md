@@ -484,7 +484,7 @@ running all validation rules, and returning a structured report.
 **Files to create / modify:**
 - `contract_sentinel/services/__init__.py` — create (empty)
 - `contract_sentinel/services/validate.py` — create
-- `tests/unit/test_validate_service.py` — create
+- `tests/unit/services/validate.py` — create
 
 **Done when:**
 - [ ] `validate_contracts(store, parser, loader, config)` returns a `ValidationReport` dataclass

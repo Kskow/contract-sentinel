@@ -20,7 +20,11 @@ class TestMissingFieldRule:
 
     def test_returns_empty_when_consumer_has_default(self) -> None:
         consumer = ContractField(
-            name="field", type="string", is_required=True, is_nullable=False, default="fallback"
+            name="field",
+            type="string",
+            is_required=True,
+            is_nullable=False,
+            metadata={"load_default": "fallback"},
         )
 
         assert MissingFieldRule().check(consumer) == []

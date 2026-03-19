@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.rules.violation import Violation
-from contract_sentinel.domain.schema import MISSING, ContractField
+
+if TYPE_CHECKING:
+    from contract_sentinel.domain.schema import ContractField
 
 
 class ConsumerOnlyRule(ABC):
@@ -17,7 +20,8 @@ class MissingFieldRule(ConsumerOnlyRule):
     """Fails when a field is absent from the producer but required (no default) in the consumer."""
 
     def check(self, consumer: ContractField) -> list[Violation]:
-        if not (consumer.is_required is True and consumer.default is MISSING):
+        consumer_has_default = "load_default" in (consumer.metadata or {})
+        if not (consumer.is_required is True and not consumer_has_default):
             return []
 
         field_path = consumer.name

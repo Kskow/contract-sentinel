@@ -1,5 +1,4 @@
 from contract_sentinel.domain.schema import (
-    MISSING,
     ContractField,
     ContractSchema,
     UnknownFieldBehaviour,
@@ -11,26 +10,33 @@ class TestContractField:
         field = ContractField(
             name="status",
             type="string",
-            format="enum",
             is_required=True,
             is_nullable=False,
-            default="active",
+            is_load_only=True,
             fields=None,
-            metadata={"deprecated": True},
+            metadata={
+                "format": "enum",
+                "allowed_values": ["active", "inactive"],
+                "load_default": "active",
+                "deprecated": True,
+            },
             unknown=UnknownFieldBehaviour.IGNORE,
-            values=["active", "inactive"],
         )
 
         expected = {
             "name": "status",
             "type": "string",
-            "format": "enum",
             "is_required": True,
             "is_nullable": False,
-            "default": "active",
-            "metadata": {"deprecated": True},
+            "is_load_only": True,
+            "is_supported": True,
+            "metadata": {
+                "format": "enum",
+                "allowed_values": ["active", "inactive"],
+                "load_default": "active",
+                "deprecated": True,
+            },
             "unknown": "ignore",
-            "values": ["active", "inactive"],
         }
         assert field.to_dict() == expected
         assert ContractField.from_dict(expected) == field
@@ -43,15 +49,17 @@ class TestContractField:
             "type": "integer",
             "is_required": False,
             "is_nullable": False,
+            "is_supported": True,
         }
-        assert field.default is MISSING
 
-    def test_to_dict_includes_default_null_when_none(self) -> None:
-        field = ContractField(
-            name="age", type="integer", is_required=False, is_nullable=True, default=None
-        )
+    def test_from_dict_defaults_optional_flags_when_absent(self) -> None:
+        data = {"name": "age", "type": "integer", "is_required": False, "is_nullable": False}
 
-        assert field.to_dict()["default"] is None
+        field = ContractField.from_dict(data)
+
+        assert field.is_load_only is False
+        assert field.is_dump_only is False
+        assert field.is_supported is True
 
     def test_to_dict_serialises_nested_fields_recursively(self) -> None:
         child = ContractField(name="street", type="string", is_required=True, is_nullable=False)
@@ -76,17 +84,6 @@ class TestContractField:
         )
 
         assert ContractField.from_dict(parent.to_dict()) == parent
-
-    def test_round_trip_preserves_equality_with_default_none(self) -> None:
-        field = ContractField(
-            name="label",
-            type="str",
-            is_required=False,
-            is_nullable=True,
-            default=None,
-        )
-
-        assert ContractField.from_dict(field.to_dict()) == field
 
 
 class TestContractSchema:
@@ -114,7 +111,11 @@ class TestContractSchema:
             unknown=UnknownFieldBehaviour.ALLOW,
         )
         name_field = ContractField(
-            name="name", type="str", is_required=True, is_nullable=False, default="anonymous"
+            name="name",
+            type="str",
+            is_required=True,
+            is_nullable=False,
+            metadata={"load_default": "anonymous"},
         )
         schema = ContractSchema(
             topic="users.registered",
