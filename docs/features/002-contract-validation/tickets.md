@@ -55,9 +55,19 @@ contract_sentinel/
 │   ├── schema.py
 │   ├── rules/
 │   │   ├── violation.py
-│   │   ├── binary_rule.py
-│   │   ├── producer_only_rule.py
-│   │   └── consumer_only_rule.py
+│   │   └── binary_rule/          ← BinaryRule(ABC) + all rule modules
+│   │       ├── base.py
+│   │       ├── type_mismatch.py
+│   │       ├── nullability_mismatch.py
+│   │       ├── requirement_mismatch.py
+│   │       ├── direction_mismatch.py
+│   │       ├── metadata_mismatch.py
+│   │       ├── allowed_values_validator.py
+│   │       ├── range_constraint.py
+│   │       ├── length_constraint.py
+│   │       ├── missing_field.py
+│   │       ├── undeclared_field.py
+│   │       └── nested_field.py
 │   ├── framework.py
 │   └── errors.py
 ├── adapters/
@@ -82,9 +92,18 @@ tests/
 │       ├── test_schema.py
 │       ├── rules/
 │       │   ├── test_violation.py
-│       │   ├── test_binary_rule.py
-│       │   ├── test_producer_only_rule.py
-│       │   └── test_consumer_only_rule.py
+│       │   └── binary_rule/
+│       │       ├── test_type_mismatch.py
+│       │       ├── test_nullability_mismatch.py
+│       │       ├── test_requirement_mismatch.py
+│       │       ├── test_direction_mismatch.py
+│       │       ├── test_metadata_mismatch.py
+│       │       ├── test_allowed_values_validator.py
+│       │       ├── test_range_constraint.py
+│       │       ├── test_length_constraint.py
+│       │       ├── test_missing_field.py
+│       │       ├── test_undeclared_field.py
+│       │       └── test_nested_field.py
 │       ├── test_loader.py
 │       └── test_framework.py
 │   ├── test_config.py
@@ -261,35 +280,51 @@ Implement automatic schema framework detection so the service layer never needs 
 **Status: ✅ Done**
 
 **Goal:**
-Implement the `Violation` dataclass, the `ValidationRule` Protocol, and all four MVP rule classes.
+Implement the `Violation` dataclass, the single `BinaryRule` ABC, and all rule classes.
 
-**Files to create / modify:**
-- `contract_sentinel/domain/rules/` — create as package (`violation.py`, `binary_rule.py`, `producer_only_rule.py`, `consumer_only_rule.py`)
-- `tests/unit/domain/rules/` — create as package (`test_violation.py`, `test_binary_rule.py`, `test_producer_only_rule.py`, `test_consumer_only_rule.py`)
+**Files created:**
+- `contract_sentinel/domain/rules/violation.py`
+- `contract_sentinel/domain/rules/binary_rule/` — one module per rule class
+- `tests/unit/domain/rules/test_violation.py`
+- `tests/unit/domain/rules/binary_rule/` — one test module per rule class
 
 **Done when:**
 - [x] `Violation` is a dataclass with fields: `rule`, `severity`, `field_path`, `producer` (dict),
       `consumer` (dict), `message`; exposes `to_dict() -> dict[str, Any]`
-- [x] Three ABCs replace the single `ValidationRule` Protocol:
-      `BinaryRule.check(producer, consumer)`, `ProducerOnlyRule.check(producer)`,
-      `ConsumerOnlyRule.check(consumer)` — all return `list[Violation]`
-- [x] `TypeMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when `producer.type != consumer.type`
-- [x] `RequirementMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when
-      `producer.is_required=False` and `consumer.is_required=True` with no default
-- [x] `NullabilityMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when
-      `producer.is_nullable=True` and `consumer.is_nullable=False`
-- [x] `MissingFieldRule(ConsumerOnlyRule)` returns a `CRITICAL` `Violation` when
-      `consumer.is_required=True` with no default (producer absence is guaranteed by dispatch)
-- [x] `UndeclaredFieldRule(ProducerOnlyRule)` carries `consumer_unknown: UnknownFieldBehaviour`;
-      returns a `CRITICAL` `Violation` when `consumer_unknown == FORBID`; returns `[]` for
-      `IGNORE` or `ALLOW`
-- [x] `MetadataMismatchRule(BinaryRule)` returns one `CRITICAL` `Violation` per consumer-declared
-      metadata key that differs from the producer (including keys absent from producer metadata)
-- [x] `EnumValuesMismatchRule(BinaryRule)` returns a `CRITICAL` `Violation` when the producer
-      can emit an enum value (`values` list) that is not present in the consumer's `values` list;
-      skipped when either side has no `values` (field may not be enum or parser didn't capture values)
-- [x] `TypeMismatchRule` compares `format` in addition to `type` — a mismatch in either field
-      triggers a violation; the `format` key is included in the violation payload only when present
+- [x] Single `BinaryRule(ABC)` in `binary_rule/base.py` with signature
+      `check(producer: ContractField | None, consumer: ContractField | None) -> list[Violation]`.
+      Rules self-determine behaviour based on which side is `None` — no separate
+      `ProducerOnlyRule` or `ConsumerOnlyRule` ABCs exist
+- [x] `TypeMismatchRule` returns a `CRITICAL` violation when `producer.type != consumer.type`;
+      returns `[]` when either side is `None`
+- [x] `RequirementMismatchRule` returns a `CRITICAL` violation when `producer.is_required=False`
+      and `consumer.is_required=True` with no default; returns `[]` when either side is `None`
+- [x] `NullabilityMismatchRule` returns a `CRITICAL` violation when `producer.is_nullable=True`
+      and `consumer.is_nullable=False`; returns `[]` when either side is `None`
+- [x] `MissingFieldRule` returns a `CRITICAL` violation when `producer is None` and
+      `consumer.is_required=True` with no default; returns `[]` when `producer is not None`
+- [x] `UndeclaredFieldRule` returns a `CRITICAL` violation when `consumer.unknown == FORBID`;
+      `consumer` is the *parent* container object (not a matched field) — its `.unknown` policy
+      determines whether the absence is a violation; returns `[]` for `IGNORE`, `ALLOW`, or unset
+- [x] `MetadataMismatchRule` returns one `CRITICAL` violation per consumer-declared metadata key
+      that differs from the producer; skips keys handled by dedicated rules (`allowed_values`,
+      `range`, `length`); returns `[]` when either side is `None`
+- [x] `AllowedValuesValidator` returns a `CRITICAL` violation (`ALLOWED_VALUES_MISMATCH`) when
+      the producer can emit a value the consumer does not accept; also fires when the producer has
+      no `allowed_values` constraint but the consumer does; returns `[]` when either side is `None`
+- [x] `RangeConstraintRule` returns `CRITICAL` violations when the producer's numeric range is
+      wider than the consumer's (checked for both min and max bounds, including inclusivity);
+      returns `[]` when either side is `None`
+- [x] `LengthConstraintRule` returns `CRITICAL` violations when the producer's string/array length
+      range is wider than the consumer's; supports `min`, `max`, and `equal` constraints;
+      returns `[]` when either side is `None`
+- [x] `DirectionMismatchRule` returns a `CRITICAL` violation when a field is `load_only` in the
+      producer (never serialised) but the consumer expects to receive it; returns `[]` when either
+      side is `None`
+- [x] `NestedFieldRule` recursively applies all rules to sub-fields of nested objects; iterates
+      the union of producer and consumer field names in a single pass (producer declaration order
+      first, consumer-only fields appended); `UndeclaredFieldRule` runs in a separate pass
+      receiving the parent consumer object so it can read `.unknown`
 - [x] `just check` passes
 
 ---

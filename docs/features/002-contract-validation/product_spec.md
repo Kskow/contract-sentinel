@@ -26,9 +26,10 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
 - Parse Marshmallow schemas into a canonical, framework-agnostic JSON contract format.
 - Store and retrieve versioned contract files in S3 so producer and consumer services can exchange
   contracts without sharing a codebase.
-- Validate producer–consumer contract compatibility using five rules: `TYPE_MISMATCH`,
-  `REQUIREMENT_MISMATCH`, `NULLABILITY_MISMATCH`, `MISSING_FIELD`, `UNDECLARED_FIELD`, and
-  `METADATA_MISMATCH`.
+- Validate producer–consumer contract compatibility using ten rules: `TYPE_MISMATCH`,
+  `REQUIREMENT_MISMATCH`, `NULLABILITY_MISMATCH`, `MISSING_FIELD`, `UNDECLARED_FIELD`,
+  `METADATA_MISMATCH`, `ALLOWED_VALUES_MISMATCH`, `RANGE_CONSTRAINT_MISMATCH`,
+  `LENGTH_CONSTRAINT_MISMATCH`, and `DIRECTION_MISMATCH`.
 - Provide a `sentinel validate` CLI command that acts as a PR gate (exits `1` on violations).
 - Provide a `sentinel publish` CLI command that pushes changed contracts to S3 after merge.
 - Detect the schema framework automatically from each schema class at runtime — no framework

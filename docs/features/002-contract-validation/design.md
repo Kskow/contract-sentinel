@@ -4,7 +4,7 @@
 
 ```
 Config Layer:    Config (plain class, env vars)
-Domain Layer:    ContractSchema (value object), Violation, BinaryRule / ProducerOnlyRule / ConsumerOnlyRule, Framework / detect_framework
+Domain Layer:    ContractSchema (value object), Violation, BinaryRule (single ABC, optional args), Framework / detect_framework
 Adapter Layer:   ContractStore(ABC) + S3ContractStore, SchemaParser(ABC) + Marshmallow3Parser
 Factory Layer:   get_parser(framework) -> SchemaParser, get_store(config) -> ContractStore
 Service Layer:   validate_contracts(), publish_contracts() use-cases
@@ -22,9 +22,18 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | Loader scanner | `contract_sentinel/domain/loader.py` |
 | `ContractSchema` value object | `contract_sentinel/domain/schema.py` |
 | `Violation` | `contract_sentinel/domain/rules/violation.py` |
-| `BinaryRule` + concrete binary rules | `contract_sentinel/domain/rules/binary_rule.py` |
-| `ProducerOnlyRule` + `UndeclaredFieldRule` | `contract_sentinel/domain/rules/producer_only_rule.py` |
-| `ConsumerOnlyRule` + `MissingFieldRule` | `contract_sentinel/domain/rules/consumer_only_rule.py` |
+| `BinaryRule(ABC)` | `contract_sentinel/domain/rules/binary_rule/base.py` |
+| `TypeMismatchRule` | `contract_sentinel/domain/rules/binary_rule/type_mismatch.py` |
+| `NullabilityMismatchRule` | `contract_sentinel/domain/rules/binary_rule/nullability_mismatch.py` |
+| `RequirementMismatchRule` | `contract_sentinel/domain/rules/binary_rule/requirement_mismatch.py` |
+| `DirectionMismatchRule` | `contract_sentinel/domain/rules/binary_rule/direction_mismatch.py` |
+| `MetadataMismatchRule` | `contract_sentinel/domain/rules/binary_rule/metadata_mismatch.py` |
+| `AllowedValuesValidator` | `contract_sentinel/domain/rules/binary_rule/allowed_values_validator.py` |
+| `RangeConstraintRule` | `contract_sentinel/domain/rules/binary_rule/range_constraint.py` |
+| `LengthConstraintRule` | `contract_sentinel/domain/rules/binary_rule/length_constraint.py` |
+| `MissingFieldRule` | `contract_sentinel/domain/rules/binary_rule/missing_field.py` |
+| `UndeclaredFieldRule` | `contract_sentinel/domain/rules/binary_rule/undeclared_field.py` |
+| `NestedFieldRule` | `contract_sentinel/domain/rules/binary_rule/nested_field.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` ABC + `S3ContractStore` | `contract_sentinel/adapters/contract_store.py` |
 | `SchemaParser` ABC + `Marshmallow3Parser` | `contract_sentinel/adapters/schema_parser.py` |
@@ -196,25 +205,35 @@ Each consumer is validated against every producer on the same topic. Any failing
 
 Directional validation: "can the consumer safely consume what this producer sends?"
 
-Rules are split into three ABCs based on which fields are present at the call site:
+A single `BinaryRule(ABC)` covers all rule types. Its signature is:
 
-- `BinaryRule.check(producer, consumer)` — both fields exist; used for type, nullability, requirement, and metadata checks
-- `ConsumerOnlyRule.check(consumer)` — producer has no such field; used for missing field checks
-- `ProducerOnlyRule.check(producer)` — consumer has no such field; used for undeclared field checks
+```python
+def check(self, producer: ContractField | None, consumer: ContractField | None) -> list[Violation]
+```
 
-The service layer dispatches to the right group based on field presence — no rule ever receives a `None` argument.
+Each rule self-determines its behaviour based on which side is `None`:
+
+- Both present → matched-field checks (type, nullability, requirement, metadata, etc.)
+- `producer is None` → consumer-only checks (e.g. `MissingFieldRule`)
+- `consumer is None` → not used in practice; all rules return `[]`
+
+`UndeclaredFieldRule` is the one special case: `consumer` is the *parent* container object
+(to read `.unknown`), not a matched field. It runs in a dedicated pass inside `NestedFieldRule`.
 
 ### MVP Rules
 
 | Rule | Trigger | Severity |
 |---|---|---|
-| `TYPE_MISMATCH` | Type or format differs between producer and consumer | CRITICAL |
+| `TYPE_MISMATCH` | Type differs between producer and consumer | CRITICAL |
 | `REQUIREMENT_MISMATCH` | Producer optional, consumer required (no default) | CRITICAL |
 | `NULLABILITY_MISMATCH` | Producer allows `null`, consumer does not | CRITICAL |
-| `MISSING_FIELD` | Field absent from producer, required by consumer (no default) | CRITICAL |
+| `MISSING_FIELD` | Field absent from producer (`producer is None`), required by consumer (no default) | CRITICAL |
 | `UNDECLARED_FIELD` | Producer has a field not declared in consumer schema and consumer `unknown == "forbid"` | CRITICAL |
 | `METADATA_MISMATCH` | A metadata key declared by consumer differs from (or is absent in) producer | CRITICAL |
-| `ENUM_VALUES_MISMATCH` | Producer can emit an enum value the consumer does not accept | CRITICAL |
+| `ALLOWED_VALUES_MISMATCH` | Producer can emit a value the consumer does not accept; also fires when producer is unconstrained but consumer is constrained | CRITICAL |
+| `RANGE_CONSTRAINT_MISMATCH` | Producer's numeric range is wider than the consumer's (min/max, inclusive boundaries) | CRITICAL |
+| `LENGTH_CONSTRAINT_MISMATCH` | Producer's string/array length range is wider than the consumer's | CRITICAL |
+| `DIRECTION_MISMATCH` | Field is `load_only` in producer (never serialised) but consumer expects to receive it | CRITICAL |
 
 > **`UNDECLARED_FIELD` directionality:** The unknown-field policy only applies during `load()`
 > (deserialization), which is what the **consumer** does. The producer serializes (`dump()`) its
@@ -222,11 +241,9 @@ The service layer dispatches to the right group based on field presence — no r
 > `UnknownFieldBehaviour` is checked. When the consumer's policy is `IGNORE` or `ALLOW`, the rule
 > returns no violation.
 >
-> **Rule constructor:** `UndeclaredFieldRule` carries `consumer_unknown: UnknownFieldBehaviour` as
-> a constructor parameter. The service layer reads `ContractSchema.unknown` (or
-> `ContractField.unknown` for nested objects) from the consumer contract and instantiates the rule
-> with the correct value per schema pair. `UndeclaredFieldRule` extends `ProducerOnlyRule` — `check(producer)` takes only the producer field;
-> the consumer field is guaranteed absent by the dispatch layer. The rule never references any framework-specific constant.
+> **`UndeclaredFieldRule`:** Takes `(producer, consumer_parent)` where `consumer` is the parent
+> container object, not a matched field. Reads `consumer.unknown` directly to determine whether
+> to fire. No constructor parameter needed — the FORBID check is internal to the rule.
 
 ### Violation Report Format
 
@@ -295,7 +312,7 @@ The service layer dispatches to the right group based on field presence — no r
 1. Load config.
 2. Scan and parse local schemas (skippable via `--skip-scan`).
 3. Fetch latest contracts from S3 per topic (by `LastModified`).
-4. Dispatch each field pair to `BinaryRule`, `ConsumerOnlyRule`, or `ProducerOnlyRule` based on field presence and collect all violations.
+4. For each field pair, call all `BinaryRule` instances with `(p_field, c_field)` where either may be `None` — rules self-dispatch based on presence and collect all violations.
 5. Print violation report.
 6. Exit `1` on any violations, exit `0` on pass.
 
