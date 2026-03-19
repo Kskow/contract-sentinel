@@ -119,6 +119,10 @@ class ContractSchema:
             "fields": [f.to_dict() for f in self.fields],
         }
 
+    def to_store_key(self) -> str:
+        """Return the canonical relative S3 key for this contract."""
+        return f"{self.topic}/{self.version}/{self.role}/{self.repository}_{self.class_name}.json"
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ContractSchema:
         return cls(

@@ -167,16 +167,21 @@ MVP adapter: `S3ContractStore`.
 ### S3 Path Convention
 
 ```
-<bucket>/<path>/<topic_name>/<version>/<role>_<repository_name>_<class_name>.json
+<bucket>/<path>/<topic_name>/<version>/<role>/<repository_name>_<class_name>.json
 ```
 
-`<path>` is the `storage.path` value from `pyproject.toml`, defaulting to `"contract_tests"`.
+`<path>` is the `SENTINEL_S3_PATH` env var, defaulting to `"contract_tests"`.
+`<role>` is a directory segment (`producer` or `consumer`), not a filename prefix.
 
 Example:
 ```
-my-bucket/contract_tests/orders.created/1.1.0/producer_order-service_OrderSchema.json
-my-bucket/contract_tests/orders.created/1.0.0/consumer_billing-service_InvoiceSchema.json
+my-bucket/contract_tests/orders.created/1.1.0/producer/order-service_OrderSchema.json
+my-bucket/contract_tests/orders.created/1.0.0/consumer/billing-service_InvoiceSchema.json
 ```
+
+`ContractSchema.to_store_key()` is the single source of truth for constructing the
+relative key. The publish service calls it when writing; the validate service uses the
+role directory segment to filter listed keys to the correct side of the contract.
 
 ### Version Resolution
 

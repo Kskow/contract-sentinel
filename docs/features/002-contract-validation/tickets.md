@@ -512,14 +512,19 @@ running all validation rules, and returning a structured report.
 
 **Done when:**
 - [ ] `validate_contracts(store, parser, loader, config)` returns a `ValidationReport` dataclass
-      with `status="PASSED"`, empty `violations`, when producer and consumer schemas are compatible
-- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework
-      before `get_parser(framework)` is invoked
+      with `status="PASSED"`, empty `violations`, when producer and consumer schemas are compatible.
+      `parser` is a `Callable[[Framework, str], SchemaParser]` (the `get_parser` factory function),
+      `loader` is a zero-arg `Callable[[], list[type]]` with the scan path already baked in
+- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
+      then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
 - [ ] Returns `status="FAILED"` with the correct `Violation` objects when a breaking rule fires
-- [ ] Each consumer is validated against every producer sharing the same topic — a violation in
-      any pair sets `status="FAILED"`
-- [ ] When `skip_scan=True`, the function fetches contracts from `store` only and skips calling
-      `loader` and `parser`
+- [ ] Each local schema is validated against every counterpart of the opposite role fetched from
+      the store for the same topic — all published versions of the counterpart are included;
+      a violation in any pair sets `status="FAILED"`
+- [ ] When `skip_scan=True`, all schemas are fetched directly from the store; `loader` and
+      `parser` are not called. All (producer, consumer) pairs across all topics are validated
+- [ ] Counterpart schemas are fetched using `store.list_files("{topic}/")` and filtered by
+      `"/{role}/"` in the key — consistent with the path convention in the design doc
 - [ ] Unit tests inject `create_autospec(ContractStore)` and `create_autospec(SchemaParser)` —
       no LocalStack required
 - [ ] `just check` passes
@@ -540,15 +545,18 @@ unchanged ones using SHA-256 content hashing.
 - `tests/unit/test_publish_service.py` — create
 
 **Done when:**
-- [ ] `publish_contracts(store, parser, loader, config)` calls `store.put()` for each
-      `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
-      S3 object
-- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework
-      before `get_parser(framework)` is invoked
-- [ ] `store.put()` is **not** called for a schema whose hash matches the current S3 object
+- [ ] `publish_contracts(store, parser, loader, config)` calls `store.put_file(key, content)` for
+      each `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
+      S3 object. `parser` and `loader` follow the same conventions as in `validate_contracts`
+- [ ] The S3 key for every write is `schema.to_store_key()` —
+      `"{topic}/{version}/{role}/{repository}_{class_name}.json"`. `ContractSchema.to_store_key()`
+      is added to `domain/schema.py` and is the single source of truth for the path convention
+- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
+      then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
+- [ ] `store.put_file()` is **not** called for a schema whose hash matches the current S3 object
 - [ ] `publish_contracts` returns a `PublishReport` with counts of `written` and `skipped` schemas
-- [ ] When a schema does not yet exist in S3 (`store.exists()` returns `False`), it is always
-      written
+- [ ] When a schema does not yet exist in S3 (`store.file_exists(key)` returns `False`), it is
+      always written without a hash comparison
 - [ ] Unit tests inject `create_autospec(ContractStore)` — no LocalStack required
 - [ ] `just check` passes
 
@@ -578,7 +586,8 @@ factory adapter construction, and write the integration test against LocalStack.
 - [ ] `sentinel validate` exits with code `0` when all contracts pass
 - [ ] `sentinel validate --skip-scan` skips local scanning and compares only S3 contracts
 - [ ] Integration test uses `typer.testing.CliRunner` with a real LocalStack bucket pre-seeded
-      with a producer and consumer contract; asserts exit code and stdout content
+      with a producer and consumer contract stored at the canonical path
+      (`{topic}/{version}/{role}/{repository}_{class_name}.json`); asserts exit code and stdout content
 - [ ] `just check` passes
 
 ---
@@ -601,5 +610,6 @@ against LocalStack.
 - [ ] `sentinel publish` prints `"no change, skipping: <filename>"` for each unchanged schema
 - [ ] `sentinel publish` exits `0` whether or not any schemas were written
 - [ ] Integration test: run `sentinel publish` twice against LocalStack with the same schemas;
-      assert exactly one S3 `put` on the first run and zero on the second (idempotency)
+      assert that objects are written to the canonical path (`{topic}/{version}/{role}/{repository}_{class_name}.json`),
+      exactly one S3 write on the first run and zero on the second (idempotency)
 - [ ] `just check` passes
