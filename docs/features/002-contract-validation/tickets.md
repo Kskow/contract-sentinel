@@ -638,3 +638,54 @@ against LocalStack.
       assert that objects are written to the canonical path (`{topic}/{version}/{role}/{repository}_{class_name}.json`),
       exactly one S3 write on the first run and zero on the second (idempotency)
 - [ ] `just check` passes
+
+---
+
+### TICKET-14 — Loader: scan exclusions
+
+**Depends on:** TICKET-06, TICKET-12
+**Type:** Enhancement
+
+**Goal:**
+Extend `load_marked_classes` and `Config` to support exclusion patterns so that directories like
+`tests/` and `.venv/` are skipped by default. Scanning the full project root is the intended usage
+(see TICKET-12), so without exclusions the loader would wastefully import test fixtures, conftest
+magic, and mock modules — none of which will ever contain `@contract` classes and many of which
+have side-effectful imports that trigger spurious warnings.
+
+**Files to create / modify:**
+- `contract_sentinel/domain/loader.py` — add `exclude` parameter to `load_marked_classes`
+- `contract_sentinel/config.py` — add `exclude` field with a sensible default list
+- `contract_sentinel/cli/validate.py` — pass `config.exclude` to loader
+- `contract_sentinel/cli/publish.py` — pass `config.exclude` to loader
+- `tests/unit/test_domain/test_loader.py` — extend with exclusion tests
+
+**Design:**
+`exclude` is a list of glob patterns matched against each file's path relative to the scan root.
+Default value covers the common cases:
+
+```python
+exclude: list[str] = ["tests/**", ".venv/**", "__pycache__/**", "*.egg-info/**"]
+```
+
+Overridable in `pyproject.toml`:
+
+```toml
+[tool.sentinel]
+path = "."
+exclude = ["tests/**", "scripts/**", ".venv/**"]
+```
+
+Matching uses `PurePath.match()` against each pattern, checked before `_try_import` is called —
+excluded files are never imported, not just filtered from results.
+
+**Done when:**
+- [ ] `load_marked_classes(path, exclude)` skips any file whose path relative to `path` matches
+      at least one pattern in `exclude`; excluded files are never passed to `_try_import`
+- [ ] Default `exclude` in `Config` covers `tests/**`, `.venv/**`, `__pycache__/**`,
+      `*.egg-info/**`
+- [ ] Both CLI commands pass `config.exclude` through to `load_marked_classes`
+- [ ] Unit tests assert that a file matching an exclusion pattern is not imported and its classes
+      do not appear in the result
+- [ ] Unit tests assert that a file outside all exclusion patterns is still discovered normally
+- [ ] `just check` passes
