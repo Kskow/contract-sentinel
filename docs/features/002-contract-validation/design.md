@@ -7,8 +7,8 @@ Config Layer:    Config (plain class, env vars)
 Domain Layer:    ContractSchema (value object), Violation, BinaryRule (single ABC, optional args), Framework / detect_framework
 Adapter Layer:   ContractStore(ABC) + S3ContractStore, SchemaParser(ABC) + Marshmallow3Parser
 Factory Layer:   get_parser(framework) -> SchemaParser, get_store(config) -> ContractStore
-Service Layer:   validate_contracts(), publish_contracts() use-cases
-CLI Layer:       `sentinel validate`, `sentinel publish` commands
+Service Layer:   validate_local_contracts(), validate_published_contracts(), publish_contracts() use-cases
+CLI Layer:       `sentinel validate`, `sentinel validate-published`, `sentinel publish` commands
 ```
 
 The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O, no ports.
@@ -311,10 +311,12 @@ Each rule self-determines its behaviour based on which side is `None`:
 
 ### `sentinel validate` — PR gate
 
+Calls `validate_local_contracts(store, parser, loader, config)`.
+
 1. Load config.
-2. Scan and parse local schemas (skippable via `--skip-scan`).
-3. Fetch latest contracts from S3 per topic (by `LastModified`).
-4. For each field pair, call all `BinaryRule` instances with `(p_field, c_field)` where either may be `None` — rules self-dispatch based on presence and collect all violations.
+2. Scan and parse local schemas.
+3. For each local schema, fetch all counterpart schemas (opposite role, same topic) from S3.
+4. Validate the local schema against every remote counterpart; collect all violations.
 5. Print violation report.
 6. Exit `1` on any violations, exit `0` on pass.
 
@@ -326,6 +328,19 @@ Each rule self-determines its behaviour based on which side is `None`:
 --------------------------------------------------
 Total Violations: 2
 ```
+
+### `sentinel validate-published` — S3 audit
+
+Calls `validate_published_contracts(store, topics=None)`.
+
+1. Load config.
+2. Fetch all published contracts from S3.
+3. Group by topic; validate every (producer, consumer) pair.
+4. Print violation report.
+5. Exit `1` on any violations, exit `0` on pass.
+
+No local schema scan is performed. Intended as a scheduled cross-service consistency
+check or for environments where the local codebase is not available.
 
 ### `sentinel publish` — post-merge
 

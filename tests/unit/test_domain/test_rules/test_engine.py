@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from contract_sentinel.domain.rules.engine import validate_group, validate_pair
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
-from tests.unit.domain.rules.helpers import field
+from tests.unit.test_domain.test_rules.helpers import field
 
 
 def _violation(field_path: str = "field") -> Violation:

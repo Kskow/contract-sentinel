@@ -54,10 +54,6 @@ class TestMarshmallow3Parser:
 
         assert result.to_dict()["unknown"] == "ignore"
 
-    # -------------------------------------------------------------------------
-    # 2. Core field properties
-    # -------------------------------------------------------------------------
-
     @pytest.mark.parametrize(("required", "expected"), [(True, True), (False, False)])
     def test_required_flag(self, required: bool, expected: bool) -> None:
         @contract(topic="t", role=Role.PRODUCER, version="1.0.0")

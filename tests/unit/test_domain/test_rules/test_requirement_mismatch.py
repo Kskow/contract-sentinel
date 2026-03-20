@@ -1,5 +1,5 @@
 from contract_sentinel.domain.rules import RequirementMismatchRule
-from tests.unit.domain.rules.helpers import field
+from tests.unit.test_domain.test_rules.helpers import field
 
 
 class TestRequirementMismatchRule:

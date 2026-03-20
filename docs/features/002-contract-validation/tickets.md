@@ -496,14 +496,14 @@ place that handles missing optional extras with actionable error messages.
 
 ---
 
-### TICKET-10 — Service: validate_contracts
+### TICKET-10 — Service: validate_local_contracts / validate_published_contracts
 
 **Depends on:** TICKET-04, TICKET-05, TICKET-06, TICKET-09
 **Type:** Service
 
 **Goal:**
-Implement the `validate_contracts` use-case that orchestrates scanning, fetching remote contracts,
-running all validation rules, and returning a structured report.
+Implement two validation use-cases: `validate_local_contracts` (PR gate — local scan vs store)
+and `validate_published_contracts` (S3 audit — store-only), both returning a structured report.
 
 **Files to create / modify:**
 - `contract_sentinel/services/__init__.py` — create (empty)
@@ -511,20 +511,28 @@ running all validation rules, and returning a structured report.
 - `tests/unit/services/validate.py` — create
 
 **Done when:**
-- [ ] `validate_contracts(store, parser, loader, config)` returns a `ValidationReport` dataclass
-      with `status="PASSED"`, empty `violations`, when producer and consumer schemas are compatible.
-      `parser` is a `Callable[[Framework, str], SchemaParser]` (the `get_parser` factory function),
-      `loader` is a zero-arg `Callable[[], list[type]]` with the scan path already baked in
+- [ ] `ValidationStatus` is a `StrEnum` with members `PASSED` and `FAILED`
+- [ ] `ContractReport` dataclass holds `topic`, `version`, `status`, and `violations` for a
+      single `(topic, version)` pair
+- [ ] `ContractsValidationReport` dataclass holds a global `status` and a `reports: list[ContractReport]`;
+      status is `FAILED` if any `ContractReport` is `FAILED`
+- [ ] `validate_local_contracts(store, parser, loader, config, topics=None)` returns a
+      `ContractsValidationReport` with `status=ValidationStatus.PASSED` when all pairs are compatible.
+      `parser` is a `Callable[[Framework, str], SchemaParser]` (the `get_parser` factory),
+      `loader` is a zero-arg `Callable[[], list[type]]` with the scan path baked in.
+      When `topics` is set, only schemas whose topic is in the list are validated
 - [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
       then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
-- [ ] Returns `status="FAILED"` with the correct `Violation` objects when a breaking rule fires
-- [ ] Each local schema is validated against every counterpart of the opposite role fetched from
-      the store for the same topic — all published versions of the counterpart are included;
-      a violation in any pair sets `status="FAILED"`
-- [ ] When `skip_scan=True`, all schemas are fetched directly from the store; `loader` and
-      `parser` are not called. All (producer, consumer) pairs across all topics are validated
-- [ ] Counterpart schemas are fetched using `store.list_files("{topic}/")` and filtered by
-      `"/{role}/"` in the key — consistent with the path convention in the design doc
+- [ ] Returns `status=ValidationStatus.FAILED` with the correct `Violation` objects when a
+      breaking rule fires; a violation in any pair sets the status to `FAILED`
+- [ ] Each local schema is validated only against counterparts of the opposite role and the
+      same version fetched from the store — counterparts are filtered by `/{version}/` and
+      `/{role}/` in the key
+- [ ] `validate_published_contracts(store, topics=None)` fetches all contracts in a single
+      `store.list_files("")` call, groups by `(topic, version)` in memory, and validates every
+      `(producer, consumer)` pair. When `topics` is set, keys whose topic prefix is not in the
+      list are skipped before fetching the file
+- [ ] Both functions emit a `logger.warning` for each requested topic that yields no schemas
 - [ ] Unit tests inject `create_autospec(ContractStore)` and `create_autospec(SchemaParser)` —
       no LocalStack required
 - [ ] `just check` passes
@@ -547,7 +555,7 @@ unchanged ones using SHA-256 content hashing.
 **Done when:**
 - [ ] `publish_contracts(store, parser, loader, config)` calls `store.put_file(key, content)` for
       each `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
-      S3 object. `parser` and `loader` follow the same conventions as in `validate_contracts`
+      S3 object. `parser` and `loader` follow the same conventions as in `validate_local_contracts`
 - [ ] The S3 key for every write is `schema.to_store_key()` —
       `"{topic}/{version}/{role}/{repository}_{class_name}.json"`. `ContractSchema.to_store_key()`
       is added to `domain/schema.py` and is the single source of truth for the path convention
@@ -568,26 +576,31 @@ unchanged ones using SHA-256 content hashing.
 **Type:** CLI
 
 **Goal:**
-Expose `validate_contracts` as the `sentinel validate` CLI command, wire config loading and
-factory adapter construction, and write the integration test against LocalStack.
+Expose `validate_local_contracts` as `sentinel validate` and `validate_published_contracts` as
+`sentinel validate-published`, wire config loading and factory adapter construction, and
+write integration tests against LocalStack.
 
 **Files to create / modify:**
 - `contract_sentinel/cli/__init__.py` — create (empty)
 - `contract_sentinel/cli/main.py` — create (Typer app object, registered as `sentinel` script)
-- `contract_sentinel/cli/validate.py` — create
+- `contract_sentinel/cli/validate.py` — create (`sentinel validate` command)
+- `contract_sentinel/cli/validate_published.py` — create (`sentinel validate-published` command)
 - `tests/integration/test_cli_validate.py` — create
 - `pyproject.toml` — modify (`uv add typer`; add `[project.scripts] sentinel = "contract_sentinel.cli.main:app"`)
 
 **Done when:**
-- [ ] `Config()` is constructed **inside** the command handler function, not at module level —
-      importing `contract_sentinel.cli.validate` must not trigger any env var reads
-- [ ] `sentinel validate` runs the full validate flow and prints the violation report to stdout
-- [ ] `sentinel validate` exits with code `1` when at least one violation is found
-- [ ] `sentinel validate` exits with code `0` when all contracts pass
-- [ ] `sentinel validate --skip-scan` skips local scanning and compares only S3 contracts
-- [ ] Integration test uses `typer.testing.CliRunner` with a real LocalStack bucket pre-seeded
-      with a producer and consumer contract stored at the canonical path
-      (`{topic}/{version}/{role}/{repository}_{class_name}.json`); asserts exit code and stdout content
+- [ ] `Config()` is constructed **inside** each command handler, not at module level —
+      importing either CLI module must not trigger any env var reads
+- [ ] `sentinel validate` calls `validate_local_contracts`, prints the violation report to stdout,
+      exits `1` on violations, exits `0` on pass
+- [ ] `sentinel validate-published` calls `validate_published_contracts`, prints the violation
+      report to stdout, exits `1` on violations, exits `0` on pass
+- [ ] Integration test for `sentinel validate` uses `typer.testing.CliRunner` with a real
+      LocalStack bucket pre-seeded with a producer and consumer contract stored at the canonical
+      path (`{topic}/{version}/{role}/{repository}_{class_name}.json`); asserts exit code and
+      stdout content
+- [ ] Integration test for `sentinel validate-published` seeds LocalStack with compatible and
+      incompatible contract pairs; asserts the correct exit code and stdout for each case
 - [ ] `just check` passes
 
 ---
