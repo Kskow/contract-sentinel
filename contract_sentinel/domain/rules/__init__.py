@@ -7,7 +7,6 @@ Re-exports every public name so callers can do
 from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
 from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
 from contract_sentinel.domain.rules.missing_field import MissingFieldRule
-from contract_sentinel.domain.rules.nested_field import NestedFieldRule
 from contract_sentinel.domain.rules.nullability_mismatch import NullabilityMismatchRule
 from contract_sentinel.domain.rules.requirement_mismatch import RequirementMismatchRule
 from contract_sentinel.domain.rules.rule import Rule
@@ -19,7 +18,6 @@ __all__ = [
     "DirectionMismatchRule",
     "MetadataMismatchRule",
     "MissingFieldRule",
-    "NestedFieldRule",
     "NullabilityMismatchRule",
     "RequirementMismatchRule",
     "Rule",

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.rules.rule import Rule
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import UnknownFieldBehaviour
 
@@ -10,23 +9,24 @@ if TYPE_CHECKING:
     from contract_sentinel.domain.schema import ContractField
 
 
-class UndeclaredFieldRule(Rule):
+class UndeclaredFieldRule:
     """Fails when the producer sends a field the consumer has not declared and forbids unknowns.
 
-    Called with the **producer** sub-field and the **parent consumer** container object
-    (not a matched consumer field).  The rule reads ``consumer.unknown`` to decide
-    whether the absence of this field in the consumer schema is a contract violation.
+    Intentionally does **not** extend ``Rule`` — its second argument is not a peer field but
+    the consumer container's unknown policy, which is a fundamentally different concept.
+    Keeping it separate makes the call site honest: callers pass ``consumer.unknown`` directly
+    rather than wrapping it in a synthetic ``ContractField``.
 
     ``FORBID`` → violation (consumer will reject the field).
-    ``IGNORE`` / ``ALLOW`` → passes silently.
+    ``IGNORE`` / ``ALLOW`` / ``None`` → passes silently.
     """
 
     def check(
-        self, producer: ContractField | None, consumer: ContractField | None
+        self, producer: ContractField | None, unknown: UnknownFieldBehaviour | None
     ) -> list[Violation]:
-        if producer is None or consumer is None:
+        if producer is None:
             return []
-        if consumer.unknown != UnknownFieldBehaviour.FORBID:
+        if unknown != UnknownFieldBehaviour.FORBID:
             return []
 
         field_path = producer.name
@@ -36,7 +36,7 @@ class UndeclaredFieldRule(Rule):
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"exists": True},
-                consumer={"exists": False, "unknown": consumer.unknown.value},
+                consumer={"exists": False, "unknown": unknown.value},
                 message=(
                     f"Field '{field_path}' is sent by Producer but is not declared"
                     " in Consumer (unknown=forbid)."
