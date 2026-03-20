@@ -548,30 +548,31 @@ and `validate_published_contracts` (S3 audit — store-only), both returning a s
 
 **Depends on:** TICKET-05, TICKET-06, TICKET-09
 **Type:** Service
+**Status: ✅ Done**
 
 **Goal:**
 Implement the `publish_contracts` use-case that writes new or changed contracts to S3 and skips
 unchanged ones using SHA-256 content hashing.
 
-**Files to create / modify:**
+**Files created / modified:**
 - `contract_sentinel/services/publish.py` — create
-- `tests/unit/test_publish_service.py` — create
+- `tests/unit/test_services/test_publish.py` — create
 
 **Done when:**
-- [ ] `publish_contracts(store, parser, loader, config)` calls `store.put_file(key, content)` for
+- [x] `publish_contracts(store, parser, loader, config)` calls `store.put_file(key, content)` for
       each `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
       S3 object. `parser` and `loader` follow the same conventions as in `validate_local_contracts`
-- [ ] The S3 key for every write is `schema.to_store_key()` —
+- [x] The S3 key for every write is `schema.to_store_key()` —
       `"{topic}/{version}/{role}/{repository}_{class_name}.json"`. `ContractSchema.to_store_key()`
       is added to `domain/schema.py` and is the single source of truth for the path convention
-- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
+- [x] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
       then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
-- [ ] `store.put_file()` is **not** called for a schema whose hash matches the current S3 object
-- [ ] `publish_contracts` returns a `PublishReport` with counts of `written` and `skipped` schemas
-- [ ] When a schema does not yet exist in S3 (`store.file_exists(key)` returns `False`), it is
+- [x] `store.put_file()` is **not** called for a schema whose hash matches the current S3 object
+- [x] `publish_contracts` returns a `PublishReport` with counts of `written` and `skipped` schemas
+- [x] When a schema does not yet exist in S3 (`store.file_exists(key)` returns `False`), it is
       always written without a hash comparison
-- [ ] Unit tests inject `create_autospec(ContractStore)` — no LocalStack required
-- [ ] `just check` passes
+- [x] Unit tests inject `create_autospec(ContractStore)` — no LocalStack required
+- [x] `just check` passes
 
 ---
 
@@ -596,6 +597,10 @@ write integration tests against LocalStack.
 **Done when:**
 - [ ] `Config()` is constructed **inside** each command handler, not at module level —
       importing either CLI module must not trigger any env var reads
+- [ ] Each command that invokes `load_marked_classes` inserts `str(Path.cwd())` at the front of
+      `sys.path` before scanning, so that app-relative imports (e.g. `from myapp.db import Base`
+      inside a schema file's transitive dependencies) resolve correctly when sentinel is run from
+      the project root
 - [ ] `sentinel validate` calls `validate_local_contracts`, prints the violation report to stdout,
       exits `1` on violations, exits `0` on pass
 - [ ] `sentinel validate-published` calls `validate_published_contracts`, prints the violation
@@ -624,6 +629,8 @@ against LocalStack.
 - `tests/integration/test_cli_publish.py` — create
 
 **Done when:**
+- [ ] `sentinel publish` inserts `str(Path.cwd())` at the front of `sys.path` before scanning
+      (same requirement as TICKET-12 — each command that calls `load_marked_classes` must do this)
 - [ ] `sentinel publish` scans, parses, and writes new or changed contracts to S3
 - [ ] `sentinel publish` prints `"no change, skipping: <filename>"` for each unchanged schema
 - [ ] `sentinel publish` exits `0` whether or not any schemas were written
