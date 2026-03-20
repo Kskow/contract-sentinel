@@ -54,16 +54,17 @@ contract_sentinel/
 │   ├── loader.py
 │   ├── schema.py
 │   ├── rules/
-│   │   ├── rule.py               ← Rule(ABC)
+│   │   ├── rule.py                   ← Rule(ABC)
 │   │   ├── violation.py
+│   │   ├── engine.py                 ← validate_pair / validate_group + recursion
 │   │   ├── type_mismatch.py
 │   │   ├── nullability_mismatch.py
 │   │   ├── requirement_mismatch.py
 │   │   ├── direction_mismatch.py
-│   │   ├── metadata_mismatch.py  ← allowed_values, range, length + generic key checks
+│   │   ├── metadata_mismatch.py      ← allowed_values, range, length + generic key checks
 │   │   ├── missing_field.py
 │   │   ├── undeclared_field.py
-│   │   └── nested_field.py
+│   │   └── counterpart_mismatch.py   ← fires when producer has no matching consumer (or vice versa)
 │   ├── framework.py
 │   └── errors.py
 ├── adapters/
@@ -72,43 +73,46 @@ contract_sentinel/
 │   └── schema_parser.py       ← SchemaParser(ABC) + Marshmallow3Parser
 ├── services/
 │   ├── __init__.py
-│   ├── validate.py
-│   └── publish.py
-└── cli/
+│   └── validate.py            ← validate_local_contracts, validate_published_contracts ✅
+│   # publish.py               ← planned (TICKET-11)
+└── cli/                       ← planned (TICKET-12, TICKET-13)
     ├── __init__.py
     ├── main.py
     ├── validate.py
     └── publish.py
 
 tests/
-├── conftest.py                ← clean_sys_modules fixture (suite-wide)
+├── conftest.py                        ← clean_sys_modules fixture (suite-wide)
 ├── unit/
-│   └── domain/
-│       ├── test_participant.py
-│       ├── test_schema.py
-│       ├── rules/
-│       │   ├── test_violation.py
-│       │   ├── test_type_mismatch.py
-│       │   ├── test_nullability_mismatch.py
-│       │   ├── test_requirement_mismatch.py
-│       │   ├── test_direction_mismatch.py
-│       │   ├── test_metadata_mismatch.py  ← covers allowed_values, range, length + generic key
-│       │   ├── test_missing_field.py
-│       │   ├── test_undeclared_field.py
-│       │   └── test_nested_field.py
-│       ├── test_loader.py
-│       └── test_framework.py
+│   ├── test_domain/
+│   │   ├── test_participant.py
+│   │   ├── test_schema.py
+│   │   ├── test_loader.py
+│   │   ├── test_framework.py
+│   │   └── test_rules/
+│   │       ├── helpers.py
+│   │       ├── test_violation.py
+│   │       ├── test_type_mismatch.py
+│   │       ├── test_nullability_mismatch.py
+│   │       ├── test_requirement_mismatch.py
+│   │       ├── test_direction_mismatch.py
+│   │       ├── test_metadata_mismatch.py  ← covers allowed_values, range, length + generic key
+│   │       ├── test_missing_field.py
+│   │       ├── test_undeclared_field.py
+│   │       ├── test_counterpart_mismatch.py
+│   │       └── test_engine.py
 │   ├── test_config.py
 │   ├── test_factory.py
-│   ├── test_validate_service.py
-│   └── test_publish_service.py
+│   └── test_services/
+│       └── test_validate.py           ✅
+│       # test_publish.py              ← planned (TICKET-11)
 └── integration/
-    ├── conftest.py            ← s3_client, s3_bucket, s3_store fixtures
-    ├── adapters/
+    ├── conftest.py                    ← s3_client, s3_bucket, s3_store fixtures
+    ├── test_adapters/
     │   ├── test_contract_store.py
     │   └── test_schema_parser.py
-    ├── test_cli_validate.py
-    └── test_cli_publish.py
+    ├── test_cli_validate.py           ← planned (TICKET-12)
+    └── test_cli_publish.py            ← planned (TICKET-13)
 ```
 
 ### Existing Patterns to Reuse
@@ -500,6 +504,7 @@ place that handles missing optional extras with actionable error messages.
 
 **Depends on:** TICKET-04, TICKET-05, TICKET-06, TICKET-09
 **Type:** Service
+**Status: ✅ Done**
 
 **Goal:**
 Implement two validation use-cases: `validate_local_contracts` (PR gate — local scan vs store)
@@ -508,34 +513,34 @@ and `validate_published_contracts` (S3 audit — store-only), both returning a s
 **Files to create / modify:**
 - `contract_sentinel/services/__init__.py` — create (empty)
 - `contract_sentinel/services/validate.py` — create
-- `tests/unit/services/validate.py` — create
+- `tests/unit/test_services/test_validate.py` — create
 
 **Done when:**
-- [ ] `ValidationStatus` is a `StrEnum` with members `PASSED` and `FAILED`
-- [ ] `ContractReport` dataclass holds `topic`, `version`, `status`, and `violations` for a
+- [x] `ValidationStatus` is a `StrEnum` with members `PASSED` and `FAILED`
+- [x] `ContractReport` dataclass holds `topic`, `version`, `status`, and `violations` for a
       single `(topic, version)` pair
-- [ ] `ContractsValidationReport` dataclass holds a global `status` and a `reports: list[ContractReport]`;
+- [x] `ContractsValidationReport` dataclass holds a global `status` and a `reports: list[ContractReport]`;
       status is `FAILED` if any `ContractReport` is `FAILED`
-- [ ] `validate_local_contracts(store, parser, loader, config, topics=None)` returns a
+- [x] `validate_local_contracts(store, parser, loader, config, topics=None)` returns a
       `ContractsValidationReport` with `status=ValidationStatus.PASSED` when all pairs are compatible.
       `parser` is a `Callable[[Framework, str], SchemaParser]` (the `get_parser` factory),
       `loader` is a zero-arg `Callable[[], list[type]]` with the scan path baked in.
       When `topics` is set, only schemas whose topic is in the list are validated
-- [ ] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
+- [x] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
       then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
-- [ ] Returns `status=ValidationStatus.FAILED` with the correct `Violation` objects when a
+- [x] Returns `status=ValidationStatus.FAILED` with the correct `Violation` objects when a
       breaking rule fires; a violation in any pair sets the status to `FAILED`
-- [ ] Each local schema is validated only against counterparts of the opposite role and the
+- [x] Each local schema is validated only against counterparts of the opposite role and the
       same version fetched from the store — counterparts are filtered by `/{version}/` and
       `/{role}/` in the key
-- [ ] `validate_published_contracts(store, topics=None)` fetches all contracts in a single
+- [x] `validate_published_contracts(store, topics=None)` fetches all contracts in a single
       `store.list_files("")` call, groups by `(topic, version)` in memory, and validates every
       `(producer, consumer)` pair. When `topics` is set, keys whose topic prefix is not in the
       list are skipped before fetching the file
-- [ ] Both functions emit a `logger.warning` for each requested topic that yields no schemas
-- [ ] Unit tests inject `create_autospec(ContractStore)` and `create_autospec(SchemaParser)` —
+- [x] Both functions emit a `logger.warning` for each requested topic that yields no schemas
+- [x] Unit tests inject `create_autospec(ContractStore)` and `create_autospec(SchemaParser)` —
       no LocalStack required
-- [ ] `just check` passes
+- [x] `just check` passes
 
 ---
 

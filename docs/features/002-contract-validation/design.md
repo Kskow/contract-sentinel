@@ -4,7 +4,7 @@
 
 ```
 Config Layer:    Config (plain class, env vars)
-Domain Layer:    ContractSchema (value object), Violation, BinaryRule (single ABC, optional args), Framework / detect_framework
+Domain Layer:    ContractSchema (value object), Violation, Rule (single ABC, optional args), Framework / detect_framework
 Adapter Layer:   ContractStore(ABC) + S3ContractStore, SchemaParser(ABC) + Marshmallow3Parser
 Factory Layer:   get_parser(framework) -> SchemaParser, get_store(config) -> ContractStore
 Service Layer:   validate_local_contracts(), validate_published_contracts(), publish_contracts() use-cases
@@ -30,13 +30,13 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 | `MetadataMismatchRule` | `contract_sentinel/domain/rules/metadata_mismatch.py` |
 | `MissingFieldRule` | `contract_sentinel/domain/rules/missing_field.py` |
 | `UndeclaredFieldRule` | `contract_sentinel/domain/rules/undeclared_field.py` |
-| `NestedFieldRule` | `contract_sentinel/domain/rules/nested_field.py` |
+| `CounterpartMismatchRule` | `contract_sentinel/domain/rules/counterpart_mismatch.py` |
+| Rule engine (recursion + orchestration) | `contract_sentinel/domain/rules/engine.py` |
 | Domain errors | `contract_sentinel/domain/errors.py` |
 | `ContractStore` ABC + `S3ContractStore` | `contract_sentinel/adapters/contract_store.py` |
 | `SchemaParser` ABC + `Marshmallow3Parser` | `contract_sentinel/adapters/schema_parser.py` |
 | Adapter factory | `contract_sentinel/factory.py` |
 | `Config` (plain class, env vars) | `contract_sentinel/config.py` |
-| `SentinelConfig` (tomllib) | `contract_sentinel/config.py` |
 | `validate` CLI command | `contract_sentinel/cli/validate.py` |
 | `publish` CLI command | `contract_sentinel/cli/publish.py` |
 
@@ -44,10 +44,10 @@ The Marker (decorator) and Loader (scanner) are pure domain utilities — no I/O
 
 | Layer | Test location | Tooling |
 |---|---|---|
-| `domain/` | `tests/unit/domain/` | Pure pytest, no mocks |
+| `domain/` | `tests/unit/test_domain/` | Pure pytest, no mocks |
 | `factory.py` | `tests/unit/` | Assert correct type is returned per config value |
-| `adapters/` | `tests/integration/adapters/` | Real external dependency (`S3ContractStore` → LocalStack; `Marshmallow3Parser` → marshmallow library) |
-| Service use-cases | `tests/unit/` | `unittest.mock.create_autospec` on adapter ABCs |
+| `adapters/` | `tests/integration/test_adapters/` | Real external dependency (`S3ContractStore` → LocalStack; `Marshmallow3Parser` → marshmallow library) |
+| Service use-cases | `tests/unit/test_services/` | `unittest.mock.create_autospec` on adapter ABCs |
 | CLI commands | `tests/integration/` | `typer.testing.CliRunner` + LocalStack |
 
 

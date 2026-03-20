@@ -56,30 +56,33 @@ contract_sentinel/
 │   ├── participant.py  # @contract decorator, Role enum, ContractMeta
 │   ├── schema.py       # ContractField, ContractSchema, UnknownFieldBehaviour
 │   ├── rules/
-│   │   ├── rule.py               # Rule(ABC) — check(producer | None, consumer | None)
-│   │   ├── violation.py          # Violation dataclass
+│   │   ├── rule.py                   # Rule(ABC) — check(producer | None, consumer | None)
+│   │   ├── violation.py              # Violation dataclass
+│   │   ├── engine.py                 # validate_pair / validate_group — rule orchestration + recursion
 │   │   ├── type_mismatch.py
 │   │   ├── nullability_mismatch.py
 │   │   ├── requirement_mismatch.py
 │   │   ├── direction_mismatch.py
-│   │   ├── metadata_mismatch.py  # allowed_values, range, length + generic key checks
-│   │   ├── missing_field.py      # fires when producer is None
-│   │   ├── undeclared_field.py   # fires when consumer.unknown == FORBID
-│   │   └── nested_field.py       # recursive sub-field validation
+│   │   ├── metadata_mismatch.py      # allowed_values, range, length + generic key checks
+│   │   ├── missing_field.py          # fires when producer is None
+│   │   ├── undeclared_field.py       # fires when consumer.unknown == FORBID
+│   │   └── counterpart_mismatch.py   # fires when a producer has no matching consumer (or vice versa)
 │   ├── framework.py    # Framework enum + detect_framework
 │   ├── loader.py       # load_marked_classes — filesystem scanner
 │   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
 ├── adapters/           # ABC + implementation(s) per concern
 │   ├── contract_store.py   # ContractStore(ABC) + S3ContractStore
 │   └── schema_parser.py    # SchemaParser(ABC)  + Marshmallow3Parser
-├── services/           # Use-case orchestration (validate, publish)
-└── cli/                # Typer CLI entrypoints
+├── services/           # Use-case orchestration
+│   └── validate.py     # validate_local_contracts, validate_published_contracts
+└── cli/                # Typer CLI entrypoints (planned)
 
 tests/
 ├── unit/
-│   └── domain/      # Pure logic tests — mirrors contract_sentinel/domain/
+│   ├── test_domain/     # Pure logic tests — mirrors contract_sentinel/domain/
+│   └── test_services/   # Service use-case tests — unittest.mock stubs, no I/O
 └── integration/
-    └── adapters/    # Adapter tests — LocalStack / moto / real subprocess
+    └── test_adapters/   # Adapter tests — LocalStack / real subprocess
 ```
 
 ## Tech Stack
