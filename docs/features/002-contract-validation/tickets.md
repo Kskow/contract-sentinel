@@ -601,16 +601,26 @@ write integration tests against LocalStack.
       `sys.path` before scanning, so that app-relative imports (e.g. `from myapp.db import Base`
       inside a schema file's transitive dependencies) resolve correctly when sentinel is run from
       the project root
+- [ ] `sentinel validate` accepts an optional `--dry-run` flag (default: `False`). When set, the
+      command prints the full violation report to stdout and exits `0` regardless of whether
+      violations were found — no side-effects, no failure signal
 - [ ] `sentinel validate` calls `validate_local_contracts`, prints the violation report to stdout,
-      exits `1` on violations, exits `0` on pass
+      exits `1` on violations (unless `--dry-run`), exits `0` on pass
+- [ ] `sentinel validate-published` accepts the same `--dry-run` flag with identical semantics
 - [ ] `sentinel validate-published` calls `validate_published_contracts`, prints the violation
-      report to stdout, exits `1` on violations, exits `0` on pass
+      report to stdout, exits `1` on violations (unless `--dry-run`), exits `0` on pass
 - [ ] Integration test for `sentinel validate` uses `typer.testing.CliRunner` with a real
       LocalStack bucket pre-seeded with a producer and consumer contract stored at the canonical
       path (`{topic}/{version}/{role}/{repository}_{class_name}.json`); asserts exit code and
       stdout content
+- [ ] Integration test for `sentinel validate` with `--dry-run`: seeds LocalStack with an
+      incompatible pair, asserts exit code is `0`, and asserts the violation report is still
+      printed to stdout
 - [ ] Integration test for `sentinel validate-published` seeds LocalStack with compatible and
       incompatible contract pairs; asserts the correct exit code and stdout for each case
+- [ ] Integration test for `sentinel validate-published` with `--dry-run`: seeds LocalStack with
+      an incompatible pair, asserts exit code is `0`, and asserts the violation report is still
+      printed to stdout
 - [ ] `just check` passes
 
 ---
@@ -647,45 +657,81 @@ against LocalStack.
 **Type:** Enhancement
 
 **Goal:**
-Extend `load_marked_classes` and `Config` to support exclusion patterns so that directories like
-`tests/` and `.venv/` are skipped by default. Scanning the full project root is the intended usage
-(see TICKET-12), so without exclusions the loader would wastefully import test fixtures, conftest
-magic, and mock modules — none of which will ever contain `@contract` classes and many of which
-have side-effectful imports that trigger spurious warnings.
+Extend `load_marked_classes` and `Config` to support exclusion patterns so that common noise
+directories (virtual environments, package trees, caches, JS dependencies) are always skipped, and
+users can add their own patterns on top without displacing the built-ins.
 
 **Files to create / modify:**
-- `contract_sentinel/domain/loader.py` — add `exclude` parameter to `load_marked_classes`
-- `contract_sentinel/config.py` — add `exclude` field with a sensible default list
+- `contract_sentinel/domain/loader.py` — add `BUILT_IN_EXCLUDE_PATTERNS` constant and `exclude`
+  parameter to `load_marked_classes`
+- `contract_sentinel/config.py` — add `exclude` field (user-supplied patterns, default empty)
 - `contract_sentinel/cli/validate.py` — pass `config.exclude` to loader
 - `contract_sentinel/cli/publish.py` — pass `config.exclude` to loader
 - `tests/unit/test_domain/test_loader.py` — extend with exclusion tests
 
 **Design:**
-`exclude` is a list of glob patterns matched against each file's path relative to the scan root.
-Default value covers the common cases:
 
-```python
-exclude: list[str] = ["tests/**", ".venv/**", "__pycache__/**", "*.egg-info/**"]
+Exclusion uses two layers that are **always merged** — the built-ins can never be removed:
+
+```
+effective patterns = BUILT_IN_EXCLUDE_PATTERNS | set(config.exclude)
 ```
 
-Overridable in `pyproject.toml`:
+Patterns are **regular expressions** matched with `re.search()` against the file's path relative
+to the scan root, with path separators normalised to `/` before matching. `re.search()` means a
+pattern matches as long as it appears anywhere in the path — no anchoring boilerplate needed.
+
+`BUILT_IN_EXCLUDE_PATTERNS` is a module-level `frozenset[str]` constant in `loader.py`:
+
+```python
+BUILT_IN_EXCLUDE_PATTERNS: frozenset[str] = frozenset({
+    r"(^|/)\.venv/",         # virtual environment (dotdir form)
+    r"(^|/)venv/",           # virtual environment (plain form)
+    r"(^|/)__pycache__/",    # bytecode cache
+    r"(^|/)site-packages/",  # installed packages inside any interpreter tree
+    r"(^|/)node_modules/",   # JS/TS dependencies
+    r"(^|/)\.git/",          # git internals
+    r"(^|/)\.tox/",          # tox environments
+    r"\.egg-info/",           # editable-install metadata
+})
+```
+
+User patterns are supplied via `config.exclude` (a `list[str]` of additional regexes, default
+`[]`) and are compiled and merged with the built-ins at the start of each scan. An invalid regex
+in `config.exclude` raises `re.error` at scan time with a clear message identifying the offending
+pattern.
+
+`pyproject.toml` opt-in (additive — built-ins still apply):
 
 ```toml
 [tool.sentinel]
 path = "."
-exclude = ["tests/**", "scripts/**", ".venv/**"]
+exclude = ["(^|/)tests/", "(^|/)scripts/"]
 ```
 
-Matching uses `PurePath.match()` against each pattern, checked before `_try_import` is called —
-excluded files are never imported, not just filtered from results.
+Matching is checked before `_try_import` is called — excluded files are never imported, not just
+filtered from results.
 
 **Done when:**
-- [ ] `load_marked_classes(path, exclude)` skips any file whose path relative to `path` matches
-      at least one pattern in `exclude`; excluded files are never passed to `_try_import`
-- [ ] Default `exclude` in `Config` covers `tests/**`, `.venv/**`, `__pycache__/**`,
-      `*.egg-info/**`
+- [ ] `BUILT_IN_EXCLUDE_PATTERNS` is a `frozenset[str]` constant defined at the top of
+      `loader.py`; it covers `.venv/`, `venv/`, `__pycache__/`, `site-packages/`,
+      `node_modules/`, `.git/`, `.tox/`, and `.egg-info/`
+- [ ] `load_marked_classes(path, exclude)` accepts `path: str | Path` (default `"."`) and
+      `exclude: list[str] | None` (default `None`); resolves exclude internally with
+      `exclude = exclude or []`; the effective pattern set is always
+      `BUILT_IN_EXCLUDE_PATTERNS | set(exclude)` — there is no way for callers to remove
+      built-in patterns
+- [ ] Matching uses `re.search()` against the relative path with separators normalised to `/`;
+      excluded files are never passed to `_try_import`
+- [ ] An invalid regex in `exclude` raises `re.error` before any file is scanned, with the
+      offending pattern included in the error message
+- [ ] `config.exclude` defaults to `None`; `load_marked_classes` resolves it with
+      `exclude = exclude or []` — avoids a mutable default argument and signals clearly that
+      the built-ins alone are sufficient for the common case
 - [ ] Both CLI commands pass `config.exclude` through to `load_marked_classes`
-- [ ] Unit tests assert that a file matching an exclusion pattern is not imported and its classes
-      do not appear in the result
-- [ ] Unit tests assert that a file outside all exclusion patterns is still discovered normally
+- [ ] Unit tests assert that a file under each built-in pattern directory is never imported
+- [ ] Unit tests assert that a user-supplied pattern in `exclude` is applied on top of the
+      built-ins without removing any of them
+- [ ] Unit tests assert that a file outside all patterns is still discovered normally
+- [ ] Unit test asserts that passing an invalid regex string raises `re.error`
 - [ ] `just check` passes
