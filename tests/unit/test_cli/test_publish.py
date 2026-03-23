@@ -8,7 +8,7 @@ from contract_sentinel.cli.main import app
 from contract_sentinel.services.publish import FailedPublish, PublishReport
 
 
-@patch("contract_sentinel.cli.publish.publish_contracts")
+@patch("contract_sentinel.cli.publish.service_publish_contracts")
 @patch("contract_sentinel.cli.publish.get_store", new=MagicMock())
 @patch("contract_sentinel.cli.publish.get_parser", new=MagicMock())
 @patch("contract_sentinel.cli.publish.load_marked_classes", new=MagicMock())
@@ -22,7 +22,7 @@ class TestPublishToStore:
         )
         runner = CliRunner()
 
-        result = runner.invoke(app, ["publish-to-store"])
+        result = runner.invoke(app, ["publish-contracts"])
 
         assert result.exit_code == 0
         assert result.output == (
@@ -40,7 +40,7 @@ class TestPublishToStore:
         )
         runner = CliRunner()
 
-        result = runner.invoke(app, ["publish-to-store"])
+        result = runner.invoke(app, ["publish-contracts"])
 
         assert result.exit_code == 0
         assert result.output == (
@@ -60,7 +60,7 @@ class TestPublishToStore:
         )
         runner = CliRunner()
 
-        result = runner.invoke(app, ["publish-to-store"])
+        result = runner.invoke(app, ["publish-contracts"])
 
         assert result.exit_code == 0
         assert result.output == (
@@ -83,7 +83,7 @@ class TestPublishToStore:
         )
         runner = CliRunner()
 
-        result = runner.invoke(app, ["publish-to-store"])
+        result = runner.invoke(app, ["publish-contracts"])
 
         assert result.exit_code == 0
         assert result.output == (
@@ -106,7 +106,7 @@ class TestPublishToStore:
         )
         runner = CliRunner()
 
-        result = runner.invoke(app, ["publish-to-store", "--verbose"])
+        result = runner.invoke(app, ["publish-contracts", "--verbose"])
 
         assert result.exit_code == 0
         assert result.output == (

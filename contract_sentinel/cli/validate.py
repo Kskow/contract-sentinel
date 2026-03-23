@@ -12,12 +12,16 @@ from contract_sentinel.factory import get_parser, get_store
 from contract_sentinel.services.validate import (
     ContractsValidationReport,
     ValidationStatus,
-    validate_local_contracts,
-    validate_published_contracts,
+)
+from contract_sentinel.services.validate import (
+    validate_local_contracts as service_validate_local_contracts,
+)
+from contract_sentinel.services.validate import (
+    validate_published_contracts as service_validate_published_contracts,
 )
 
 
-def validate_local(
+def validate_local_contracts(
     path: Annotated[
         Path,
         typer.Option("--path", help="Directory to scan for @contract classes."),
@@ -45,7 +49,7 @@ def validate_local(
     def loader() -> list[type]:
         return load_marked_classes(scan_path)
 
-    report = validate_local_contracts(store, get_parser, loader, config)
+    report = service_validate_local_contracts(store, get_parser, loader, config)
 
     print_report(report, verbose=verbose)
 
@@ -53,7 +57,7 @@ def validate_local(
         raise typer.Exit(code=1)
 
 
-def validate_published(
+def validate_published_contracts(
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Print the report but always exit 0."),
@@ -66,7 +70,7 @@ def validate_published(
     """Validate all published contracts against each other."""
     config = Config()
     store = get_store(config)
-    report = validate_published_contracts(store)
+    report = service_validate_published_contracts(store)
 
     print_report(report, verbose=verbose)
 

@@ -298,7 +298,9 @@ class TestValidateLocal:
         _seed(s3_store, _producer())
         (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
 
-        result = CliRunner().invoke(app, ["validate-local", "--path", str(tmp_path)], env=cli_env)
+        result = CliRunner().invoke(
+            app, ["validate-local-contracts", "--path", str(tmp_path)], env=cli_env
+        )
 
         assert result.exit_code == 0
         assert result.output == "\nContract Validation — PASSED\n\n\n"
@@ -313,7 +315,7 @@ class TestValidateLocal:
         (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
 
         result = CliRunner().invoke(
-            app, ["validate-local", "--path", str(tmp_path), "--verbose"], env=cli_env
+            app, ["validate-local-contracts", "--path", str(tmp_path), "--verbose"], env=cli_env
         )
 
         assert result.exit_code == 0
@@ -334,7 +336,9 @@ class TestValidateLocal:
         _seed(s3_store, _producer(field_type="string"))
         (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
 
-        result = CliRunner().invoke(app, ["validate-local", "--path", str(tmp_path)], env=cli_env)
+        result = CliRunner().invoke(
+            app, ["validate-local-contracts", "--path", str(tmp_path)], env=cli_env
+        )
 
         assert result.exit_code == 1
         assert result.output == (
@@ -357,7 +361,7 @@ class TestValidateLocal:
         (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
 
         result = CliRunner().invoke(
-            app, ["validate-local", "--path", str(tmp_path), "--dry-run"], env=cli_env
+            app, ["validate-local-contracts", "--path", str(tmp_path), "--dry-run"], env=cli_env
         )
 
         assert result.exit_code == 0
@@ -380,7 +384,7 @@ class TestValidatePublished:
     ) -> None:
         _seed(s3_store, _producer(), _consumer())
 
-        result = CliRunner().invoke(app, ["validate-published"], env=cli_env)
+        result = CliRunner().invoke(app, ["validate-published-contracts"], env=cli_env)
 
         assert result.exit_code == 0
         assert result.output == "\nContract Validation — PASSED\n\n\n"
@@ -392,7 +396,7 @@ class TestValidatePublished:
     ) -> None:
         _seed(s3_store, _producer(), _consumer())
 
-        result = CliRunner().invoke(app, ["validate-published", "--verbose"], env=cli_env)
+        result = CliRunner().invoke(app, ["validate-published-contracts", "--verbose"], env=cli_env)
 
         assert result.exit_code == 0
         assert result.output == (
@@ -410,7 +414,7 @@ class TestValidatePublished:
     ) -> None:
         _seed(s3_store, _producer(field_type="string"), _consumer())
 
-        result = CliRunner().invoke(app, ["validate-published"], env=cli_env)
+        result = CliRunner().invoke(app, ["validate-published-contracts"], env=cli_env)
 
         assert result.exit_code == 1
         assert result.output == (
@@ -430,7 +434,7 @@ class TestValidatePublished:
     ) -> None:
         _seed(s3_store, _producer(field_type="string"), _consumer())
 
-        result = CliRunner().invoke(app, ["validate-published", "--dry-run"], env=cli_env)
+        result = CliRunner().invoke(app, ["validate-published-contracts", "--dry-run"], env=cli_env)
 
         assert result.exit_code == 0
         assert result.output == (

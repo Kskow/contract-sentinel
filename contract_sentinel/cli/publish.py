@@ -9,10 +9,15 @@ import typer
 from contract_sentinel.config import Config
 from contract_sentinel.domain.loader import load_marked_classes
 from contract_sentinel.factory import get_parser, get_store
-from contract_sentinel.services.publish import PublishReport, publish_contracts
+from contract_sentinel.services.publish import (
+    PublishReport,
+)
+from contract_sentinel.services.publish import (
+    publish_contracts as service_publish_contracts,
+)
 
 
-def publish_to_store(
+def publish_contracts(
     path: Annotated[
         Path,
         typer.Option("--path", help="Directory to scan for @contract classes."),
@@ -36,7 +41,7 @@ def publish_to_store(
     def loader() -> list[type]:
         return load_marked_classes(scan_path)
 
-    report = publish_contracts(store, get_parser, loader, config)
+    report = service_publish_contracts(store, get_parser, loader, config)
 
     _print_publish_report(report, verbose=verbose)
 
