@@ -656,6 +656,7 @@ against LocalStack.
 
 **Depends on:** TICKET-12
 **Type:** Enhancement
+**Status: ✅ Done**
 
 **Goal:**
 Each violation line in `sentinel validate-local` and `sentinel validate-published` output currently
@@ -700,18 +701,18 @@ is omitted and the line renders exactly as before — no breaking change to exis
 - `tests/unit/test_cli/test_report.py` — add cases asserting the parenthetical renders correctly
 
 **Done when:**
-- [ ] `Violation` gains `producer_id: str | None = None` and `consumer_id: str | None = None`;
+- [x] `Violation` gains `producer_id: str | None = None` and `consumer_id: str | None = None`;
       both fields are included in `to_dict()` when not `None`
-- [ ] `validate_pair` is updated to accept `producer_id` and `consumer_id` as parameters and
+- [x] `validate_pair` is updated to accept `producer_id` and `consumer_id` as parameters and
       stamp every `Violation` it creates or recurses into with those values
-- [ ] `validate_group` passes `f"{schema.repository}/{schema.class_name}"` for both IDs when
+- [x] `validate_group` passes `f"{schema.repository}/{schema.class_name}"` for both IDs when
       calling `validate_pair` for each producer/consumer combination
-- [ ] `CounterpartMismatchRule` violations carry the ID of the lonely schema in `producer_id`
+- [x] `CounterpartMismatchRule` violations carry the ID of the lonely schema in `producer_id`
       or `consumer_id` as appropriate; the absent side is `None`
-- [ ] `print_report` appends `  ({producer_id} → {consumer_id})` to the violation rule line
+- [x] `print_report` appends `  ({producer_id} → {consumer_id})` to the violation rule line
       when both IDs are present; renders nothing extra when either is `None`
-- [ ] All existing tests continue to pass without modification (IDs default to `None`)
-- [ ] `just check` passes
+- [x] All existing tests continue to pass without modification (IDs default to `None`)
+- [x] `just check` passes
 
 ---
 

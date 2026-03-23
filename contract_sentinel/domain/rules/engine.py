@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 from typing import TYPE_CHECKING
 
+from contract_sentinel.domain.participant import Role
 from contract_sentinel.domain.rules.counterpart_mismatch import CounterpartMismatchRule
 from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
 from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
@@ -13,9 +14,12 @@ from contract_sentinel.domain.rules.type_mismatch import TypeMismatchRule
 from contract_sentinel.domain.rules.undeclared_field import UndeclaredFieldRule
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from contract_sentinel.domain.rules.rule import Rule
     from contract_sentinel.domain.rules.violation import Violation
     from contract_sentinel.domain.schema import ContractField, ContractSchema
+
 
 PAIR_RULES: list[Rule] = [
     TypeMismatchRule(),
@@ -27,32 +31,77 @@ PAIR_RULES: list[Rule] = [
 ]
 
 
-def validate_group(
+@dataclasses.dataclass
+class PairViolations:
+    """Violations produced by a single producer/consumer pair."""
+
+    producer_id: str | None
+    consumer_id: str | None
+    violations: list[Violation]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "producer_id": self.producer_id,
+            "consumer_id": self.consumer_id,
+            "violations": [v.to_dict() for v in self.violations],
+        }
+
+
+def validate_contract(schemas: list[ContractSchema]) -> list[PairViolations]:
+    """Split a flat list of schemas by role and validate them as a group.
+
+    Convenience entry point over _validate_group — callers pass the full mixed
+    list and role-splitting is handled here rather than at the call site.
+    """
+    producers = [s for s in schemas if s.role == Role.PRODUCER.value]
+    consumers = [s for s in schemas if s.role == Role.CONSUMER.value]
+    return _validate_group(producers, consumers)
+
+
+def _validate_group(
     producers: list[ContractSchema],
     consumers: list[ContractSchema],
-) -> list[Violation]:
+) -> list[PairViolations]:
     """Validate a whole group of producers and consumers for one (topic, version) pair.
 
     Checks if counterparts exist (e.g. at least one producer for consumers).
-    If a schema is 'lonely', emits a WARNING violation and skips rest checks.
-    Otherwise, runs all validate_pair combinations.
+    If a schema is 'lonely', returns a single PairViolations with the absent side set
+    to None and skips pairwise checks. Otherwise returns one PairViolations per
+    producer x consumer combination.
     """
-
-    violations: list[Violation] = []
-
-    # 1. Counterpart check
+    # 1. Counterpart check — lonely schema short-circuits pairwise validation.
     if counterpart_violations := CounterpartMismatchRule().check(producers, consumers):
-        return counterpart_violations
+        if not producers:
+            first = consumers[0]
+            return [
+                PairViolations(
+                    producer_id=None,
+                    consumer_id=f"{first.repository}/{first.class_name}",
+                    violations=counterpart_violations,
+                )
+            ]
+        first = producers[0]
+        return [
+            PairViolations(
+                producer_id=f"{first.repository}/{first.class_name}",
+                consumer_id=None,
+                violations=counterpart_violations,
+            )
+        ]
 
-    # 2. Pairwise check
-    for producer in producers:
-        for consumer in consumers:
-            violations.extend(validate_pair(producer, consumer))
+    # 2. Pairwise check — one PairViolations per producer x consumer combination.
+    return [
+        PairViolations(
+            producer_id=f"{producer.repository}/{producer.class_name}",
+            consumer_id=f"{consumer.repository}/{consumer.class_name}",
+            violations=_validate_pair(producer, consumer),
+        )
+        for producer in producers
+        for consumer in consumers
+    ]
 
-    return violations
 
-
-def validate_pair(
+def _validate_pair(
     producer: ContractSchema | ContractField,
     consumer: ContractSchema | ContractField,
 ) -> list[Violation]:
@@ -68,7 +117,7 @@ def validate_pair(
     fields receive ``(None, consumer_field)`` so MissingFieldRule can fire.
 
     **Nested pass** — for matched fields where both sides declare sub-fields of the same
-    type, recurses into ``validate_pair`` and prefixes violation paths with the parent
+    type, recurses into ``_validate_pair`` and prefixes violation paths with the parent
     field name (e.g. ``"street"`` becomes ``"address.street"``).
 
     **Undeclared pass** — producer-only fields are checked against ``consumer.unknown``
@@ -94,7 +143,7 @@ def validate_pair(
             and producer_field.fields is not None
             and consumer_field.fields is not None
         ):
-            nested = validate_pair(producer_field, consumer_field)
+            nested = _validate_pair(producer_field, consumer_field)
             violations.extend(_with_path_prefix(v, producer_field.name) for v in nested)
 
     for field_name, producer_field in producer_fields.items():

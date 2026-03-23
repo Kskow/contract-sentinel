@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from contract_sentinel.domain.rules.engine import validate_group, validate_pair
+from contract_sentinel.domain.rules.engine import PairViolations, validate_contract
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 from tests.unit.test_domain.test_rules.helpers import field
@@ -21,17 +21,35 @@ def _violation(field_path: str = "field") -> Violation:
 
 def _schema(
     fields_list: list[ContractField],
+    role: str = "producer",
     unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
+    repository: str = "test-repo",
 ) -> ContractSchema:
     return ContractSchema(
         topic="orders",
-        role="producer",
+        role=role,
         version="1.0.0",
-        repository="test-repo",
+        repository=repository,
         class_name="OrderSchema",
         unknown=unknown,
         fields=fields_list,
     )
+
+
+def _producer(
+    fields_list: list[ContractField],
+    unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
+    repository: str = "producer-repo",
+) -> ContractSchema:
+    return _schema(fields_list, role="producer", unknown=unknown, repository=repository)
+
+
+def _consumer(
+    fields_list: list[ContractField],
+    unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
+    repository: str = "consumer-repo",
+) -> ContractSchema:
+    return _schema(fields_list, role="consumer", unknown=unknown, repository=repository)
 
 
 def _mock_rule(return_value: list[Violation] | None = None) -> MagicMock:
@@ -40,7 +58,125 @@ def _mock_rule(return_value: list[Violation] | None = None) -> MagicMock:
     return rule
 
 
-class TestValidatePair:
+class TestPairViolationsToDict:
+    def test_serialises_producer_consumer_ids_and_violations(self) -> None:
+        violation = _violation("id")
+        pair = PairViolations(
+            producer_id="orders-service/OrderSchema",
+            consumer_id="checkout-service/OrderConsumerSchema",
+            violations=[violation],
+        )
+
+        assert pair.to_dict() == {
+            "producer_id": "orders-service/OrderSchema",
+            "consumer_id": "checkout-service/OrderConsumerSchema",
+            "violations": [violation.to_dict()],
+        }
+
+    def test_serialises_empty_violations(self) -> None:
+        pair = PairViolations(
+            producer_id="orders-service/OrderSchema",
+            consumer_id="checkout-service/OrderConsumerSchema",
+            violations=[],
+        )
+
+        assert pair.to_dict() == {
+            "producer_id": "orders-service/OrderSchema",
+            "consumer_id": "checkout-service/OrderConsumerSchema",
+            "violations": [],
+        }
+
+    def test_serialises_none_ids_for_lonely_schema(self) -> None:
+        pair = PairViolations(
+            producer_id="orders-service/OrderSchema",
+            consumer_id=None,
+            violations=[_violation()],
+        )
+
+        assert pair.to_dict() == {
+            "producer_id": "orders-service/OrderSchema",
+            "consumer_id": None,
+            "violations": [_violation().to_dict()],
+        }
+
+
+class TestValidateContract:
+    def test_splits_mixed_list_by_role_before_validating(self) -> None:
+        result = validate_contract(
+            [
+                _producer([field(name="id", type="string")]),
+                _consumer([field(name="id", type="string")]),
+            ]
+        )
+
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [],
+        }
+
+    def test_returns_empty_list_for_empty_input(self) -> None:
+        assert validate_contract([]) == []
+
+    def test_returns_counterpart_violation_when_producer_has_no_consumer(self) -> None:
+        rule = _mock_rule()
+
+        with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
+            result = validate_contract([_producer([field(name="id", type="string")])])
+
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": None,
+            "violations": [
+                {
+                    "rule": "COUNTERPART_MISMATCH",
+                    "severity": "WARNING",
+                    "field_path": "",
+                    "producer": {},
+                    "consumer": {},
+                    "message": (
+                        "Topic 'orders' version '1.0.0' has 1 producer(s) but no matching consumer."
+                    ),
+                }
+            ],
+        }
+        assert rule.check.call_count == 0
+
+    def test_returns_counterpart_violation_when_consumer_has_no_producer(self) -> None:
+        rule = _mock_rule()
+
+        with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
+            result = validate_contract([_consumer([field(name="id", type="string")])])
+
+        assert result[0].to_dict() == {
+            "producer_id": None,
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [
+                {
+                    "rule": "COUNTERPART_MISMATCH",
+                    "severity": "WARNING",
+                    "field_path": "",
+                    "producer": {},
+                    "consumer": {},
+                    "message": (
+                        "Topic 'orders' version '1.0.0' has 1 consumer(s) but no matching producer."
+                    ),
+                }
+            ],
+        }
+        assert rule.check.call_count == 0
+
+    def test_runs_pairwise_validation_for_every_producer_consumer_combination(self) -> None:
+        p1 = _producer([field(name="id", type="string")], repository="p1-repo")
+        c1 = _consumer([field(name="id", type="string")], repository="c1-repo")
+        c2 = _consumer([field(name="id", type="string")], repository="c2-repo")
+
+        rule = _mock_rule()
+        with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
+            validate_contract([p1, c1, c2])
+
+        assert rule.check.call_count == 2
+
     def test_every_rule_is_called_for_a_matched_field(self) -> None:
         rule_a = _mock_rule()
         rule_b = _mock_rule()
@@ -48,7 +184,7 @@ class TestValidatePair:
         c_field = field(name="id", type="string")
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule_a, rule_b]):
-            validate_pair(_schema([p_field]), _schema([c_field]))
+            validate_contract([_producer([p_field]), _consumer([c_field])])
 
         rule_a.check.assert_called_once_with(p_field, c_field)
         rule_b.check.assert_called_once_with(p_field, c_field)
@@ -61,7 +197,7 @@ class TestValidatePair:
         c_name = field(name="name", type="string")
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            validate_pair(_schema([p_id, p_name]), _schema([c_id, c_name]))
+            validate_contract([_producer([p_id, p_name]), _consumer([c_id, c_name])])
 
         assert rule.check.call_count == 2
         rule.check.assert_any_call(p_id, c_id)
@@ -72,7 +208,7 @@ class TestValidatePair:
         c_field = field(name="extra", type="string", is_required=False)
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            validate_pair(_schema([]), _schema([c_field]))
+            validate_contract([_producer([]), _consumer([c_field])])
 
         rule.check.assert_called_once_with(None, c_field)
 
@@ -81,11 +217,8 @@ class TestValidatePair:
         p_field = field(name="extra", type="string")
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            # Consumer IGNORE keeps the undeclared pass silent so it doesn't pollute assertions.
-            # Producer unknown is irrelevant — only consumer.unknown governs the undeclared pass.
-            validate_pair(
-                _schema([p_field]),
-                _schema([], unknown=UnknownFieldBehaviour.IGNORE),
+            validate_contract(
+                [_producer([p_field]), _consumer([], unknown=UnknownFieldBehaviour.IGNORE)]
             )
 
         rule.check.assert_called_once_with(p_field, None)
@@ -95,12 +228,18 @@ class TestValidatePair:
         rule = _mock_rule(return_value=[violation])
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            result = validate_pair(
-                _schema([field(name="id", type="string")]),
-                _schema([field(name="id", type="string")]),
+            result = validate_contract(
+                [
+                    _producer([field(name="id", type="string")]),
+                    _consumer([field(name="id", type="string")]),
+                ]
             )
 
-        assert result == [violation]
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [violation.to_dict()],
+        }
 
     def test_violations_from_multiple_fields_are_aggregated(self) -> None:
         v1 = _violation("id")
@@ -109,16 +248,21 @@ class TestValidatePair:
         rule.check.side_effect = [[v1], [v2]]
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            result = validate_pair(
-                _schema([field(name="id", type="string"), field(name="name", type="string")]),
-                _schema([field(name="id", type="string"), field(name="name", type="string")]),
+            result = validate_contract(
+                [
+                    _producer([field(name="id", type="string"), field(name="name", type="string")]),
+                    _consumer([field(name="id", type="string"), field(name="name", type="string")]),
+                ]
             )
 
-        assert result == [v1, v2]
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [v1.to_dict(), v2.to_dict()],
+        }
 
     def test_violation_path_is_prefixed_at_depth_1(self) -> None:
-        # TypeMismatchRule fires on address.lat (string vs number).
-        producer = _schema(
+        producer = _producer(
             [
                 field(
                     name="address",
@@ -128,7 +272,7 @@ class TestValidatePair:
                 )
             ]
         )
-        consumer = _schema(
+        consumer = _consumer(
             [
                 field(
                     name="address",
@@ -139,15 +283,28 @@ class TestValidatePair:
             ]
         )
 
-        violations = validate_pair(producer, consumer)
+        result = validate_contract([producer, consumer])
 
-        assert len(violations) == 1
-        assert violations[0].field_path == "address.lat"
-        assert "'address.lat'" in violations[0].message
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [
+                {
+                    "rule": "TYPE_MISMATCH",
+                    "severity": "CRITICAL",
+                    "field_path": "address.lat",
+                    "producer": {"type": "string"},
+                    "consumer": {"type": "number"},
+                    "message": (
+                        "Field 'address.lat' is a 'string' in Producer"
+                        " but Consumer expects a 'number'."
+                    ),
+                }
+            ],
+        }
 
     def test_violation_path_is_prefixed_at_depth_2(self) -> None:
-        # TypeMismatchRule fires on address.location.lat (string vs number).
-        producer = _schema(
+        producer = _producer(
             [
                 field(
                     name="address",
@@ -164,7 +321,7 @@ class TestValidatePair:
                 )
             ]
         )
-        consumer = _schema(
+        consumer = _consumer(
             [
                 field(
                     name="address",
@@ -182,15 +339,28 @@ class TestValidatePair:
             ]
         )
 
-        violations = validate_pair(producer, consumer)
+        result = validate_contract([producer, consumer])
 
-        assert len(violations) == 1
-        assert violations[0].field_path == "address.location.lat"
-        assert "'address.location.lat'" in violations[0].message
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [
+                {
+                    "rule": "TYPE_MISMATCH",
+                    "severity": "CRITICAL",
+                    "field_path": "address.location.lat",
+                    "producer": {"type": "string"},
+                    "consumer": {"type": "number"},
+                    "message": (
+                        "Field 'address.location.lat' is a 'string' in Producer"
+                        " but Consumer expects a 'number'."
+                    ),
+                }
+            ],
+        }
 
     def test_skips_recursion_when_field_types_differ(self) -> None:
-        # Producer is "object", consumer is "array" — types differ, no nested pass.
-        producer = _schema(
+        producer = _producer(
             [
                 field(
                     name="data",
@@ -200,15 +370,29 @@ class TestValidatePair:
                 )
             ]
         )
-        consumer = _schema([field(name="data", type="array")])
+        consumer = _consumer([field(name="data", type="array")])
 
-        violations = validate_pair(producer, consumer)
+        result = validate_contract([producer, consumer])
 
-        # TypeMismatchRule fires on "data" itself — no dot-separated paths.
-        assert all(v.field_path == "data" for v in violations)
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [
+                {
+                    "rule": "TYPE_MISMATCH",
+                    "severity": "CRITICAL",
+                    "field_path": "data",
+                    "producer": {"type": "object"},
+                    "consumer": {"type": "array"},
+                    "message": (
+                        "Field 'data' is a 'object' in Producer but Consumer expects a 'array'."
+                    ),
+                }
+            ],
+        }
 
     def test_skips_recursion_when_one_side_has_no_sub_fields(self) -> None:
-        producer = _schema(
+        producer = _producer(
             [
                 field(
                     name="data",
@@ -218,66 +402,67 @@ class TestValidatePair:
                 )
             ]
         )
-        consumer = _schema([field(name="data", type="object")])  # no sub-fields
+        consumer = _consumer([field(name="data", type="object")])
 
-        violations = validate_pair(producer, consumer)
+        result = validate_contract([producer, consumer])
 
-        assert not any("." in v.field_path for v in violations)
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [],
+        }
 
     def test_fires_when_producer_only_field_and_consumer_forbids_unknowns(self) -> None:
-        producer = _schema(
+        producer = _producer(
             [field(name="internal_id", type="string")],
             unknown=UnknownFieldBehaviour.FORBID,
         )
-        consumer = _schema([], unknown=UnknownFieldBehaviour.FORBID)
+        consumer = _consumer([], unknown=UnknownFieldBehaviour.FORBID)
 
-        violations = validate_pair(producer, consumer)
+        result = validate_contract([producer, consumer])
 
-        assert len(violations) == 1
-        assert violations[0].rule == "UNDECLARED_FIELD"
-        assert violations[0].field_path == "internal_id"
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [
+                {
+                    "rule": "UNDECLARED_FIELD",
+                    "severity": "CRITICAL",
+                    "field_path": "internal_id",
+                    "producer": {"exists": True},
+                    "consumer": {"exists": False, "unknown": "forbid"},
+                    "message": (
+                        "Field 'internal_id' is sent by Producer but is not declared"
+                        " in Consumer (unknown=forbid)."
+                    ),
+                }
+            ],
+        }
 
     def test_silent_when_consumer_ignores_unknowns(self) -> None:
-        # Producer unknown is irrelevant — only consumer.unknown governs the undeclared pass.
-        producer = _schema([field(name="internal_id", type="string")])
-        consumer = _schema([], unknown=UnknownFieldBehaviour.IGNORE)
+        result = validate_contract(
+            [
+                _producer([field(name="internal_id", type="string")]),
+                _consumer([], unknown=UnknownFieldBehaviour.IGNORE),
+            ]
+        )
 
-        assert validate_pair(producer, consumer) == []
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [],
+        }
 
     def test_silent_when_consumer_allows_unknowns(self) -> None:
-        # Producer unknown is irrelevant — only consumer.unknown governs the undeclared pass.
-        producer = _schema([field(name="internal_id", type="string")])
-        consumer = _schema([], unknown=UnknownFieldBehaviour.ALLOW)
+        result = validate_contract(
+            [
+                _producer([field(name="internal_id", type="string")]),
+                _consumer([], unknown=UnknownFieldBehaviour.ALLOW),
+            ]
+        )
 
-        assert validate_pair(producer, consumer) == []
-
-
-class TestValidateGroup:
-    def test_returns_counterpart_violations_and_skips_pairwise_on_lonely_producer(self) -> None:
-        producer = _schema([field(name="id", type="string")])
-        rule = _mock_rule()
-
-        with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            violations = validate_group([producer], [])
-
-        assert len(violations) == 1
-        assert violations[0].rule == "COUNTERPART_MISMATCH"
-        # pairwise rule was never called
-        assert rule.check.call_count == 0
-
-    def test_runs_pairwise_validation_for_every_producer_consumer_combination(self) -> None:
-        p1 = _schema([field(name="id", type="string")])
-        p1.repository = "p1-repo"
-        c1 = _schema([field(name="id", type="string")])
-        c1.role = "consumer"
-        c1.repository = "c1-repo"
-        c2 = _schema([field(name="id", type="string")])
-        c2.role = "consumer"
-        c2.repository = "c2-repo"
-
-        rule = _mock_rule()
-        with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            validate_group([p1], [c1, c2])
-
-        # p1 vs c1, p1 vs c2
-        assert rule.check.call_count == 2
+        assert result[0].to_dict() == {
+            "producer_id": "producer-repo/OrderSchema",
+            "consumer_id": "consumer-repo/OrderSchema",
+            "violations": [],
+        }

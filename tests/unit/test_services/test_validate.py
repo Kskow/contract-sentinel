@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import marshmallow
 
+from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 from contract_sentinel.services.validate import (
@@ -72,7 +73,6 @@ def _parser(*schemas: ContractSchema) -> MagicMock:
     if len(schemas) == 1:
         parser_instance.parse.return_value = schemas[0]
     else:
-        # Map schemas to classes based on index
         schema_list = list(schemas)
         classes = [_MarshmallowClass, _OtherMarshmallowClass]
         schema_map = dict(zip(classes, schema_list, strict=False))
@@ -88,70 +88,27 @@ def _config(name: str = "test-repo") -> MagicMock:
 
 
 class TestContractReportToDict:
-    def test_passed_report_with_no_violations(self) -> None:
+    def test_serialises_empty_pairs(self) -> None:
         report = ContractReport(
-            topic="orders", version="1.0.0", status=ValidationStatus.PASSED, violations=[]
+            topic="orders", version="1.0.0", status=ValidationStatus.PASSED, pairs=[]
         )
 
         assert report.to_dict() == {
             "topic": "orders",
             "version": "1.0.0",
             "status": "PASSED",
-            "violations": [],
+            "pairs": [],
         }
 
-    def test_failed_report_serialises_violations(self) -> None:
+    def test_serialises_pairs_with_violations(self) -> None:
         report = ContractReport(
             topic="orders",
             version="1.0.0",
             status=ValidationStatus.FAILED,
-            violations=[
-                Violation(
-                    rule="TYPE_MISMATCH",
-                    severity="CRITICAL",
-                    field_path="id",
-                    producer={"type": "string"},
-                    consumer={"type": "integer"},
-                    message=(
-                        "Field 'id' is a 'string' in Producer but Consumer expects a 'integer'."
-                    ),
-                )
-            ],
-        )
-
-        assert report.to_dict() == {
-            "topic": "orders",
-            "version": "1.0.0",
-            "status": "FAILED",
-            "violations": [
-                {
-                    "rule": "TYPE_MISMATCH",
-                    "severity": "CRITICAL",
-                    "field_path": "id",
-                    "producer": {"type": "string"},
-                    "consumer": {"type": "integer"},
-                    "message": (
-                        "Field 'id' is a 'string' in Producer but Consumer expects a 'integer'."
-                    ),
-                }
-            ],
-        }
-
-
-class TestContractsValidationReportToDict:
-    def test_passed_with_no_reports(self) -> None:
-        report = ContractsValidationReport(status=ValidationStatus.PASSED, reports=[])
-
-        assert report.to_dict() == {"status": "PASSED", "reports": []}
-
-    def test_failed_serialises_nested_reports_and_violations(self) -> None:
-        report = ContractsValidationReport(
-            status=ValidationStatus.FAILED,
-            reports=[
-                ContractReport(
-                    topic="orders",
-                    version="1.0.0",
-                    status=ValidationStatus.FAILED,
+            pairs=[
+                PairViolations(
+                    producer_id="orders-service/OrderSchema",
+                    consumer_id="checkout-service/OrderSchema",
                     violations=[
                         Violation(
                             rule="TYPE_MISMATCH",
@@ -170,12 +127,13 @@ class TestContractsValidationReportToDict:
         )
 
         assert report.to_dict() == {
+            "topic": "orders",
+            "version": "1.0.0",
             "status": "FAILED",
-            "reports": [
+            "pairs": [
                 {
-                    "topic": "orders",
-                    "version": "1.0.0",
-                    "status": "FAILED",
+                    "producer_id": "orders-service/OrderSchema",
+                    "consumer_id": "checkout-service/OrderSchema",
                     "violations": [
                         {
                             "rule": "TYPE_MISMATCH",
@@ -187,6 +145,74 @@ class TestContractsValidationReportToDict:
                                 "Field 'id' is a 'string' in Producer"
                                 " but Consumer expects a 'integer'."
                             ),
+                        }
+                    ],
+                }
+            ],
+        }
+
+
+class TestContractsValidationReportToDict:
+    def test_serialises_empty_reports(self) -> None:
+        report = ContractsValidationReport(status=ValidationStatus.PASSED, reports=[])
+
+        assert report.to_dict() == {"status": "PASSED", "reports": []}
+
+    def test_serialises_nested_reports_and_pairs(self) -> None:
+        report = ContractsValidationReport(
+            status=ValidationStatus.FAILED,
+            reports=[
+                ContractReport(
+                    topic="orders",
+                    version="1.0.0",
+                    status=ValidationStatus.FAILED,
+                    pairs=[
+                        PairViolations(
+                            producer_id="orders-service/OrderSchema",
+                            consumer_id="checkout-service/OrderSchema",
+                            violations=[
+                                Violation(
+                                    rule="TYPE_MISMATCH",
+                                    severity="CRITICAL",
+                                    field_path="id",
+                                    producer={"type": "string"},
+                                    consumer={"type": "integer"},
+                                    message=(
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                )
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+
+        assert report.to_dict() == {
+            "status": "FAILED",
+            "reports": [
+                {
+                    "topic": "orders",
+                    "version": "1.0.0",
+                    "status": "FAILED",
+                    "pairs": [
+                        {
+                            "producer_id": "orders-service/OrderSchema",
+                            "consumer_id": "checkout-service/OrderSchema",
+                            "violations": [
+                                {
+                                    "rule": "TYPE_MISMATCH",
+                                    "severity": "CRITICAL",
+                                    "field_path": "id",
+                                    "producer": {"type": "string"},
+                                    "consumer": {"type": "integer"},
+                                    "message": (
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 }
@@ -219,7 +245,18 @@ class TestValidateLocalContracts:
         assert result.to_dict() == {
             "status": "PASSED",
             "reports": [
-                {"topic": "orders", "version": "1.0.0", "status": "PASSED", "violations": []}
+                {
+                    "topic": "orders",
+                    "version": "1.0.0",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                }
             ],
         }
 
@@ -241,17 +278,23 @@ class TestValidateLocalContracts:
                     "topic": "orders",
                     "version": "1.0.0",
                     "status": "FAILED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "TYPE_MISMATCH",
-                            "severity": "CRITICAL",
-                            "field_path": "id",
-                            "producer": {"type": "string"},
-                            "consumer": {"type": "integer"},
-                            "message": (
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [
+                                {
+                                    "rule": "TYPE_MISMATCH",
+                                    "severity": "CRITICAL",
+                                    "field_path": "id",
+                                    "producer": {"type": "string"},
+                                    "consumer": {"type": "integer"},
+                                    "message": (
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 }
@@ -275,17 +318,23 @@ class TestValidateLocalContracts:
                     "topic": "orders",
                     "version": "1.0.0",
                     "status": "PASSED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "COUNTERPART_MISMATCH",
-                            "severity": "WARNING",
-                            "field_path": "",
-                            "producer": {},
-                            "consumer": {},
-                            "message": (
-                                "Topic 'orders' version '1.0.0' has 1 producer(s)"
-                                " but no matching consumer."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": None,
+                            "violations": [
+                                {
+                                    "rule": "COUNTERPART_MISMATCH",
+                                    "severity": "WARNING",
+                                    "field_path": "",
+                                    "producer": {},
+                                    "consumer": {},
+                                    "message": (
+                                        "Topic 'orders' version '1.0.0' has 1 producer(s)"
+                                        " but no matching consumer."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 }
@@ -344,17 +393,23 @@ class TestValidateLocalContracts:
                     "topic": "orders",
                     "version": "1.0.0",
                     "status": "PASSED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "COUNTERPART_MISMATCH",
-                            "severity": "WARNING",
-                            "field_path": "",
-                            "producer": {},
-                            "consumer": {},
-                            "message": (
-                                "Topic 'orders' version '1.0.0' has 1 producer(s)"
-                                " but no matching consumer."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": None,
+                            "violations": [
+                                {
+                                    "rule": "COUNTERPART_MISMATCH",
+                                    "severity": "WARNING",
+                                    "field_path": "",
+                                    "producer": {},
+                                    "consumer": {},
+                                    "message": (
+                                        "Topic 'orders' version '1.0.0' has 1 producer(s)"
+                                        " but no matching consumer."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 },
@@ -362,17 +417,23 @@ class TestValidateLocalContracts:
                     "topic": "orders",
                     "version": "2.0.0",
                     "status": "PASSED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "COUNTERPART_MISMATCH",
-                            "severity": "WARNING",
-                            "field_path": "",
-                            "producer": {},
-                            "consumer": {},
-                            "message": (
-                                "Topic 'orders' version '2.0.0' has 1 producer(s)"
-                                " but no matching consumer."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": None,
+                            "violations": [
+                                {
+                                    "rule": "COUNTERPART_MISMATCH",
+                                    "severity": "WARNING",
+                                    "field_path": "",
+                                    "producer": {},
+                                    "consumer": {},
+                                    "message": (
+                                        "Topic 'orders' version '2.0.0' has 1 producer(s)"
+                                        " but no matching consumer."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 },
@@ -398,22 +459,39 @@ class TestValidateLocalContracts:
         assert result.to_dict() == {
             "status": "FAILED",
             "reports": [
-                {"topic": "orders", "version": "1.0.0", "status": "PASSED", "violations": []},
+                {
+                    "topic": "orders",
+                    "version": "1.0.0",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "ok-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                },
                 {
                     "topic": "payments",
                     "version": "1.0.0",
                     "status": "FAILED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "TYPE_MISMATCH",
-                            "severity": "CRITICAL",
-                            "field_path": "id",
-                            "producer": {"type": "string"},
-                            "consumer": {"type": "integer"},
-                            "message": (
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "bad-repo/OrderSchema",
+                            "violations": [
+                                {
+                                    "rule": "TYPE_MISMATCH",
+                                    "severity": "CRITICAL",
+                                    "field_path": "id",
+                                    "producer": {"type": "string"},
+                                    "consumer": {"type": "integer"},
+                                    "message": (
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 },
@@ -436,7 +514,18 @@ class TestValidatePublishedContracts:
         assert result.to_dict() == {
             "status": "PASSED",
             "reports": [
-                {"topic": "orders", "version": "1.0.0", "status": "PASSED", "violations": []}
+                {
+                    "topic": "orders",
+                    "version": "1.0.0",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                }
             ],
         }
 
@@ -453,17 +542,23 @@ class TestValidatePublishedContracts:
                     "topic": "orders",
                     "version": "1.0.0",
                     "status": "FAILED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "TYPE_MISMATCH",
-                            "severity": "CRITICAL",
-                            "field_path": "id",
-                            "producer": {"type": "string"},
-                            "consumer": {"type": "integer"},
-                            "message": (
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [
+                                {
+                                    "rule": "TYPE_MISMATCH",
+                                    "severity": "CRITICAL",
+                                    "field_path": "id",
+                                    "producer": {"type": "string"},
+                                    "consumer": {"type": "integer"},
+                                    "message": (
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 }
@@ -482,17 +577,23 @@ class TestValidatePublishedContracts:
                     "topic": "orders",
                     "version": "1.0.0",
                     "status": "PASSED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "COUNTERPART_MISMATCH",
-                            "severity": "WARNING",
-                            "field_path": "",
-                            "producer": {},
-                            "consumer": {},
-                            "message": (
-                                "Topic 'orders' version '1.0.0' has 1 producer(s)"
-                                " but no matching consumer."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": None,
+                            "violations": [
+                                {
+                                    "rule": "COUNTERPART_MISMATCH",
+                                    "severity": "WARNING",
+                                    "field_path": "",
+                                    "producer": {},
+                                    "consumer": {},
+                                    "message": (
+                                        "Topic 'orders' version '1.0.0' has 1 producer(s)"
+                                        " but no matching consumer."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 }
@@ -539,8 +640,30 @@ class TestValidatePublishedContracts:
         assert result.to_dict() == {
             "status": "PASSED",
             "reports": [
-                {"topic": "orders", "version": "1.0.0", "status": "PASSED", "violations": []},
-                {"topic": "orders", "version": "2.0.0", "status": "PASSED", "violations": []},
+                {
+                    "topic": "orders",
+                    "version": "1.0.0",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                },
+                {
+                    "topic": "orders",
+                    "version": "2.0.0",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                },
             ],
         }
 
@@ -559,22 +682,39 @@ class TestValidatePublishedContracts:
         assert result.to_dict() == {
             "status": "FAILED",
             "reports": [
-                {"topic": "orders", "version": "1.0.0", "status": "PASSED", "violations": []},
+                {
+                    "topic": "orders",
+                    "version": "1.0.0",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                },
                 {
                     "topic": "payments",
                     "version": "1.0.0",
                     "status": "FAILED",
-                    "violations": [
+                    "pairs": [
                         {
-                            "rule": "TYPE_MISMATCH",
-                            "severity": "CRITICAL",
-                            "field_path": "id",
-                            "producer": {"type": "string"},
-                            "consumer": {"type": "integer"},
-                            "message": (
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [
+                                {
+                                    "rule": "TYPE_MISMATCH",
+                                    "severity": "CRITICAL",
+                                    "field_path": "id",
+                                    "producer": {"type": "string"},
+                                    "consumer": {"type": "integer"},
+                                    "message": (
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                }
+                            ],
                         }
                     ],
                 },

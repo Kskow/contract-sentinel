@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.framework import detect_framework
 from contract_sentinel.domain.participant import Role
-from contract_sentinel.domain.rules.engine import validate_group
+from contract_sentinel.domain.rules.engine import validate_contract
 from contract_sentinel.domain.schema import ContractSchema
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from contract_sentinel.adapters.schema_parser import SchemaParser
     from contract_sentinel.config import Config
     from contract_sentinel.domain.framework import Framework
-    from contract_sentinel.domain.rules.violation import Violation
+    from contract_sentinel.domain.rules.engine import PairViolations
 
 
 class ValidationStatus(StrEnum):
@@ -32,19 +32,19 @@ class ValidationStatus(StrEnum):
 
 @dataclasses.dataclass
 class ContractReport:
-    """Validation result for a single (topic, version) pair."""
+    """Validation result for a single (topic, version) group, broken down by pair."""
 
     topic: str
     version: str
     status: ValidationStatus
-    violations: list[Violation]
+    pairs: list[PairViolations]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "topic": self.topic,
             "version": self.version,
             "status": self.status,
-            "violations": [v.to_dict() for v in self.violations],
+            "pairs": [p.to_dict() for p in self.pairs],
         }
 
 
@@ -96,17 +96,13 @@ def _validate_local_contract(store: ContractStore, local_schema: ContractSchema)
         if f"/{local_schema.version}/" in key and f"/{opposite_role.value}/" in key:
             counterparts.append(ContractSchema.from_dict(json.loads(store.get_file(key))))
 
-    schemas = [local_schema, *counterparts]
-    producers = [schema for schema in schemas if schema.role == Role.PRODUCER.value]
-    consumers = [schema for schema in schemas if schema.role == Role.CONSUMER.value]
-
-    violations = validate_group(producers, consumers)
+    pairs = validate_contract([local_schema, *counterparts])
 
     return ContractReport(
         topic=local_schema.topic,
         version=local_schema.version,
-        status=_derive_status(violations),
-        violations=violations,
+        status=_derive_status(pairs),
+        pairs=pairs,
     )
 
 
@@ -139,33 +135,30 @@ def _validate_published_contract(
     schemas: list[ContractSchema],
 ) -> ContractReport:
     """Validate all published schemas for one (topic, version) pair against each other."""
-    producers = [schema for schema in schemas if schema.role == Role.PRODUCER.value]
-    consumers = [schema for schema in schemas if schema.role == Role.CONSUMER.value]
-
-    violations = validate_group(producers, consumers)
+    pairs = validate_contract(schemas)
 
     return ContractReport(
         topic=topic,
         version=version,
-        status=_derive_status(violations),
-        violations=violations,
+        status=_derive_status(pairs),
+        pairs=pairs,
     )
 
 
-def _derive_status(violations: list[Violation]) -> ValidationStatus:
+def _derive_status(pairs: list[PairViolations]) -> ValidationStatus:
     """FAILED only when at least one CRITICAL violation exists; WARNING-only stays PASSED."""
-    return (
-        ValidationStatus.FAILED
-        if any(v.severity == "CRITICAL" for v in violations)
-        else ValidationStatus.PASSED
-    )
+    for pair in pairs:
+        for violation in pair.violations:
+            if violation.severity == "CRITICAL":
+                return ValidationStatus.FAILED
+    return ValidationStatus.PASSED
 
 
 def _build_report(topic_reports: list[ContractReport]) -> ContractsValidationReport:
     """Roll up a list of ContractReports into a single ContractsValidationReport."""
-    global_status = (
-        ValidationStatus.FAILED
-        if any(report.status == ValidationStatus.FAILED for report in topic_reports)
-        else ValidationStatus.PASSED
-    )
+    global_status = ValidationStatus.PASSED
+    for report in topic_reports:
+        if report.status == ValidationStatus.FAILED:
+            global_status = ValidationStatus.FAILED
+            break
     return ContractsValidationReport(status=global_status, reports=topic_reports)

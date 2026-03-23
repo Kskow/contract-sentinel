@@ -90,8 +90,16 @@ def print_report(report: ContractsValidationReport, *, verbose: bool = False) ->
             contract_line = typer.style(contract_line, fg=typer.colors.RED)
 
         typer.echo(contract_line)
-        for violation in contract_report.violations:
-            typer.echo(f"       [{violation.severity}] {violation.rule} @ {violation.field_path}")
-            typer.echo(f"       {violation.message}")
+        for pair in contract_report.pairs:
+            if not verbose and not pair.violations:
+                continue
+            producer = pair.producer_id or "(none)"
+            consumer = pair.consumer_id or "(none)"
+            typer.echo(f"       {producer} vs {consumer}")
+            for violation in pair.violations:
+                typer.echo(
+                    f"         [{violation.severity}] {violation.rule} @ {violation.field_path}"
+                )
+                typer.echo(f"         {violation.message}")
 
     typer.echo("")

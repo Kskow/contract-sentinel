@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from contract_sentinel.cli.main import app
 from contract_sentinel.cli.validate import print_report
+from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 from contract_sentinel.services.validate import (
@@ -73,7 +74,13 @@ class TestPrintReport:
                     topic="orders",
                     version="1.0.0",
                     status=ValidationStatus.PASSED,
-                    violations=[],
+                    pairs=[
+                        PairViolations(
+                            producer_id="orders-service/OrderProducerSchema",
+                            consumer_id="test-repo/OrderConsumerSchema",
+                            violations=[],
+                        )
+                    ],
                 )
             ],
         )
@@ -82,7 +89,13 @@ class TestPrintReport:
         with redirect_stdout(buf):
             print_report(report, verbose=True)
 
-        assert buf.getvalue() == ("\nContract Validation — PASSED\n\n  ✓  orders/1.0.0\n\n")
+        assert buf.getvalue() == (
+            "\nContract Validation — PASSED\n"
+            "\n"
+            "  ✓  orders/1.0.0\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "\n"
+        )
 
     def test_hides_passed_contracts_by_default(self) -> None:
         report = ContractsValidationReport(
@@ -92,7 +105,7 @@ class TestPrintReport:
                     topic="orders",
                     version="1.0.0",
                     status=ValidationStatus.PASSED,
-                    violations=[],
+                    pairs=[],
                 )
             ],
         )
@@ -111,17 +124,23 @@ class TestPrintReport:
                     topic="orders",
                     version="1.0.0",
                     status=ValidationStatus.FAILED,
-                    violations=[
-                        Violation(
-                            rule="TYPE_MISMATCH",
-                            severity="CRITICAL",
-                            field_path="id",
-                            producer={"type": "string"},
-                            consumer={"type": "integer"},
-                            message=(
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
+                    pairs=[
+                        PairViolations(
+                            producer_id="orders-service/OrderProducerSchema",
+                            consumer_id="test-repo/OrderConsumerSchema",
+                            violations=[
+                                Violation(
+                                    rule="TYPE_MISMATCH",
+                                    severity="CRITICAL",
+                                    field_path="id",
+                                    producer={"type": "string"},
+                                    consumer={"type": "integer"},
+                                    message=(
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                )
+                            ],
                         )
                     ],
                 )
@@ -136,8 +155,9 @@ class TestPrintReport:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✗  orders/1.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
         )
 
@@ -149,29 +169,35 @@ class TestPrintReport:
                     topic="orders",
                     version="1.0.0",
                     status=ValidationStatus.FAILED,
-                    violations=[
-                        Violation(
-                            rule="TYPE_MISMATCH",
-                            severity="CRITICAL",
-                            field_path="id",
-                            producer={"type": "string"},
-                            consumer={"type": "integer"},
-                            message=(
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
-                        ),
-                        Violation(
-                            rule="NULLABILITY_MISMATCH",
-                            severity="CRITICAL",
-                            field_path="name",
-                            producer={"is_nullable": True},
-                            consumer={"is_nullable": False},
-                            message=(
-                                "Field 'name' is nullable in Producer"
-                                " but Consumer does not allow null."
-                            ),
-                        ),
+                    pairs=[
+                        PairViolations(
+                            producer_id="orders-service/OrderProducerSchema",
+                            consumer_id="test-repo/OrderConsumerSchema",
+                            violations=[
+                                Violation(
+                                    rule="TYPE_MISMATCH",
+                                    severity="CRITICAL",
+                                    field_path="id",
+                                    producer={"type": "string"},
+                                    consumer={"type": "integer"},
+                                    message=(
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                ),
+                                Violation(
+                                    rule="NULLABILITY_MISMATCH",
+                                    severity="CRITICAL",
+                                    field_path="name",
+                                    producer={"is_nullable": True},
+                                    consumer={"is_nullable": False},
+                                    message=(
+                                        "Field 'name' is nullable in Producer"
+                                        " but Consumer does not allow null."
+                                    ),
+                                ),
+                            ],
+                        )
                     ],
                 )
             ],
@@ -185,10 +211,11 @@ class TestPrintReport:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✗  orders/1.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
-            "       [CRITICAL] NULLABILITY_MISMATCH @ name\n"
-            "       Field 'name' is nullable in Producer but Consumer does not allow null.\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "         [CRITICAL] NULLABILITY_MISMATCH @ name\n"
+            "         Field 'name' is nullable in Producer but Consumer does not allow null.\n"
             "\n"
         )
 
@@ -200,23 +227,35 @@ class TestPrintReport:
                     topic="orders",
                     version="1.0.0",
                     status=ValidationStatus.PASSED,
-                    violations=[],
+                    pairs=[
+                        PairViolations(
+                            producer_id="orders-service/OrderProducerSchema",
+                            consumer_id="test-repo/OrderConsumerSchema",
+                            violations=[],
+                        )
+                    ],
                 ),
                 ContractReport(
                     topic="payments",
                     version="2.0.0",
                     status=ValidationStatus.FAILED,
-                    violations=[
-                        Violation(
-                            rule="TYPE_MISMATCH",
-                            severity="CRITICAL",
-                            field_path="id",
-                            producer={"type": "string"},
-                            consumer={"type": "integer"},
-                            message=(
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
+                    pairs=[
+                        PairViolations(
+                            producer_id="payments-service/PaymentProducerSchema",
+                            consumer_id="test-repo/PaymentConsumerSchema",
+                            violations=[
+                                Violation(
+                                    rule="TYPE_MISMATCH",
+                                    severity="CRITICAL",
+                                    field_path="id",
+                                    producer={"type": "string"},
+                                    consumer={"type": "integer"},
+                                    message=(
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                )
+                            ],
                         )
                     ],
                 ),
@@ -231,9 +270,11 @@ class TestPrintReport:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✓  orders/1.0.0\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "  ✗  payments/2.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "       payments-service/PaymentProducerSchema vs test-repo/PaymentConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
         )
 
@@ -276,7 +317,13 @@ class TestValidateLocal:
         )
 
         assert result.exit_code == 0
-        assert result.output == "\nContract Validation — PASSED\n\n  ✓  orders/1.0.0\n\n"
+        assert result.output == (
+            "\nContract Validation — PASSED\n"
+            "\n"
+            "  ✓  orders/1.0.0\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "\n"
+        )
 
     def test_fails_when_schemas_are_incompatible(
         self,
@@ -294,8 +341,9 @@ class TestValidateLocal:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✗  orders/1.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
         )
 
@@ -317,8 +365,9 @@ class TestValidateLocal:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✗  orders/1.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
         )
 
@@ -346,7 +395,13 @@ class TestValidatePublished:
         result = CliRunner().invoke(app, ["validate-published", "--verbose"], env=cli_env)
 
         assert result.exit_code == 0
-        assert result.output == "\nContract Validation — PASSED\n\n  ✓  orders/1.0.0\n\n"
+        assert result.output == (
+            "\nContract Validation — PASSED\n"
+            "\n"
+            "  ✓  orders/1.0.0\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "\n"
+        )
 
     def test_fails_when_schemas_are_incompatible(
         self,
@@ -362,8 +417,9 @@ class TestValidatePublished:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✗  orders/1.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
         )
 
@@ -381,7 +437,8 @@ class TestValidatePublished:
             "\nContract Validation — FAILED\n"
             "\n"
             "  ✗  orders/1.0.0\n"
-            "       [CRITICAL] TYPE_MISMATCH @ id\n"
-            "       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
         )
