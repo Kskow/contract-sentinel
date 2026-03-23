@@ -3,15 +3,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import pytest
-
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 from contract_sentinel.domain.loader import load_marked_classes
 
 
-@pytest.mark.usefixtures("clean_sys_modules")
 class TestLoadMarkedClasses:
     def test_returns_class_decorated_with_contract(self, tmp_path: Path) -> None:
         (tmp_path / "schemas.py").write_text(

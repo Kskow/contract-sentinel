@@ -73,13 +73,13 @@ contract_sentinel/
 │   └── schema_parser.py       ← SchemaParser(ABC) + Marshmallow3Parser
 ├── services/
 │   ├── __init__.py
-│   └── validate.py            ← validate_local_contracts, validate_published_contracts ✅
-│   # publish.py               ← planned (TICKET-11)
-└── cli/                       ← planned (TICKET-12, TICKET-13)
+│   ├── validate.py            ← validate_local_contracts, validate_published_contracts ✅
+│   └── publish.py             ← publish_contracts ✅
+└── cli/
     ├── __init__.py
-    ├── main.py
-    ├── validate.py
-    └── publish.py
+    ├── main.py                ← Typer app entry-point, registered as `sentinel` script ✅
+    ├── validate.py            ← sentinel validate-local / sentinel validate-published ✅
+    └── publish.py             ← sentinel publish ✅
 
 tests/
 ├── conftest.py                        ← clean_sys_modules fixture (suite-wide)
@@ -103,16 +103,19 @@ tests/
 │   │       └── test_engine.py
 │   ├── test_config.py
 │   ├── test_factory.py
-│   └── test_services/
-│       └── test_validate.py           ✅
-│       # test_publish.py              ← planned (TICKET-11)
+│   ├── test_services/
+│   │   ├── test_validate.py           ✅
+│   │   └── test_publish.py            ✅
+│   └── test_cli/
+│       └── test_publish.py            ✅
 └── integration/
     ├── conftest.py                    ← s3_client, s3_bucket, s3_store fixtures
     ├── test_adapters/
     │   ├── test_contract_store.py
     │   └── test_schema_parser.py
-    ├── test_cli_validate.py           ← planned (TICKET-12)
-    └── test_cli_publish.py            ← planned (TICKET-13)
+    └── test_cli/
+        ├── test_validate.py           ✅
+        └── test_publish.py            ← pending (TICKET-13)
 ```
 
 ### Existing Patterns to Reuse
@@ -630,25 +633,32 @@ write integration tests against LocalStack.
 
 **Depends on:** TICKET-01, TICKET-11, TICKET-12
 **Type:** CLI
+**Status: ✅ Done**
 
 **Goal:**
 Expose `publish_contracts` as the `sentinel publish` CLI command and write the integration test
 against LocalStack.
 
 **Files to create / modify:**
-- `contract_sentinel/cli/publish.py` — create
-- `tests/integration/test_cli_publish.py` — create
+- `contract_sentinel/cli/publish.py` — create ✅
+- `tests/unit/test_cli/test_publish.py` — create ✅
+- `tests/integration/test_cli/test_publish.py` — create ✅
 
 **Done when:**
-- [ ] `sentinel publish` inserts `str(Path.cwd())` at the front of `sys.path` before scanning
+- [x] `sentinel publish` inserts `str(Path.cwd())` at the front of `sys.path` before scanning
       (same requirement as TICKET-12 — each command that calls `load_marked_classes` must do this)
-- [ ] `sentinel publish` scans, parses, and writes new or changed contracts to S3
-- [ ] `sentinel publish` prints `"no change, skipping: <filename>"` for each unchanged schema
-- [ ] `sentinel publish` exits `0` whether or not any schemas were written
-- [ ] Integration test: run `sentinel publish` twice against LocalStack with the same schemas;
+- [x] `sentinel publish` scans, parses, and writes new or changed contracts to S3 using a
+      two-phase approach: all classes are parsed first; if any parse fails the write phase is
+      skipped entirely, preventing partial publishes
+- [x] `sentinel publish` returns a `PublishReport` with four buckets — `published` (new keys),
+      `updated` (hash-changed keys), `unchanged` (skipped), `failed` (parse or write errors) —
+      and prints a structured summary to stdout; `--verbose` reveals unchanged schemas
+- [x] `sentinel publish` exits `0` whether or not any schemas were written
+- [x] Integration test: run `sentinel publish` twice against LocalStack with the same schemas;
       assert that objects are written to the canonical path (`{topic}/{version}/{role}/{repository}_{class_name}.json`),
-      exactly one S3 write on the first run and zero on the second (idempotency)
-- [ ] `just check` passes
+      exactly one S3 write on the first run and zero on the second (idempotency). Additional
+      cases cover content-change detection (updated bucket) and `--verbose` output
+- [x] `just check` passes
 
 ---
 

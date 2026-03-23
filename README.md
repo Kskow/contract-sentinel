@@ -74,15 +74,21 @@ contract_sentinel/
 │   ├── contract_store.py   # ContractStore(ABC) + S3ContractStore
 │   └── schema_parser.py    # SchemaParser(ABC)  + Marshmallow3Parser
 ├── services/           # Use-case orchestration
-│   └── validate.py     # validate_local_contracts, validate_published_contracts
-└── cli/                # Typer CLI entrypoints (planned)
+│   ├── validate.py     # validate_local_contracts, validate_published_contracts
+│   └── publish.py      # publish_contracts — idempotent SHA-256 hash-gated writes
+└── cli/                # Typer CLI entrypoints (wired as `sentinel` script)
+    ├── main.py         # Typer app entry-point
+    ├── validate.py     # sentinel validate-local / sentinel validate-published
+    └── publish.py      # sentinel publish
 
 tests/
 ├── unit/
 │   ├── test_domain/     # Pure logic tests — mirrors contract_sentinel/domain/
-│   └── test_services/   # Service use-case tests — unittest.mock stubs, no I/O
+│   ├── test_services/   # Service use-case tests — unittest.mock stubs, no I/O
+│   └── test_cli/        # CLI unit tests — Typer CliRunner, no real infra
 └── integration/
-    └── test_adapters/   # Adapter tests — LocalStack / real subprocess
+    ├── test_adapters/   # Adapter tests — LocalStack
+    └── test_cli/        # CLI integration tests — LocalStack
 ```
 
 ## Tech Stack
