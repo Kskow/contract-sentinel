@@ -24,7 +24,7 @@ Two external systems are abstracted behind ABCs co-located with their implementa
 ```
 User decorates schema class with @contract(...)
          ↓
-sentinel validate / sentinel publish  (CLI entry)
+sentinel validate-local / sentinel validate-published / sentinel publish  (CLI entry)
          ↓
 Load Config (env vars — AWS_*, S3_BUCKET, SENTINEL_* prefix)
          ↓
@@ -576,52 +576,53 @@ unchanged ones using SHA-256 content hashing.
 
 ---
 
-### TICKET-12 — CLI: sentinel validate
+### TICKET-12 — CLI: sentinel validate-local
 
 **Depends on:** TICKET-01, TICKET-10
 **Type:** CLI
+**Status: ✅ Done**
 
 **Goal:**
-Expose `validate_local_contracts` as `sentinel validate` and `validate_published_contracts` as
+Expose `validate_local_contracts` as `sentinel validate-local` and `validate_published_contracts` as
 `sentinel validate-published`, wire config loading and factory adapter construction, and
 write integration tests against LocalStack.
 
 **Files to create / modify:**
 - `contract_sentinel/cli/__init__.py` — create (empty)
 - `contract_sentinel/cli/main.py` — create (Typer app object, registered as `sentinel` script)
-- `contract_sentinel/cli/validate.py` — create (`sentinel validate` command)
+- `contract_sentinel/cli/validate.py` — create (`sentinel validate-local` command)
 - `contract_sentinel/cli/validate_published.py` — create (`sentinel validate-published` command)
 - `tests/integration/test_cli_validate.py` — create
 - `pyproject.toml` — modify (`uv add typer`; add `[project.scripts] sentinel = "contract_sentinel.cli.main:app"`)
 
 **Done when:**
-- [ ] `Config()` is constructed **inside** each command handler, not at module level —
+- [x] `Config()` is constructed **inside** each command handler, not at module level —
       importing either CLI module must not trigger any env var reads
-- [ ] Each command that invokes `load_marked_classes` inserts `str(Path.cwd())` at the front of
+- [x] Each command that invokes `load_marked_classes` inserts `str(Path.cwd())` at the front of
       `sys.path` before scanning, so that app-relative imports (e.g. `from myapp.db import Base`
       inside a schema file's transitive dependencies) resolve correctly when sentinel is run from
       the project root
-- [ ] `sentinel validate` accepts an optional `--dry-run` flag (default: `False`). When set, the
+- [x] `sentinel validate-local` accepts an optional `--dry-run` flag (default: `False`). When set, the
       command prints the full violation report to stdout and exits `0` regardless of whether
       violations were found — no side-effects, no failure signal
-- [ ] `sentinel validate` calls `validate_local_contracts`, prints the violation report to stdout,
+- [x] `sentinel validate-local` calls `validate_local_contracts`, prints the violation report to stdout,
       exits `1` on violations (unless `--dry-run`), exits `0` on pass
-- [ ] `sentinel validate-published` accepts the same `--dry-run` flag with identical semantics
-- [ ] `sentinel validate-published` calls `validate_published_contracts`, prints the violation
+- [x] `sentinel validate-published` accepts the same `--dry-run` flag with identical semantics
+- [x] `sentinel validate-published` calls `validate_published_contracts`, prints the violation
       report to stdout, exits `1` on violations (unless `--dry-run`), exits `0` on pass
-- [ ] Integration test for `sentinel validate` uses `typer.testing.CliRunner` with a real
+- [x] Integration test for `sentinel validate-local` uses `typer.testing.CliRunner` with a real
       LocalStack bucket pre-seeded with a producer and consumer contract stored at the canonical
       path (`{topic}/{version}/{role}/{repository}_{class_name}.json`); asserts exit code and
       stdout content
-- [ ] Integration test for `sentinel validate` with `--dry-run`: seeds LocalStack with an
+- [x] Integration test for `sentinel validate-local` with `--dry-run`: seeds LocalStack with an
       incompatible pair, asserts exit code is `0`, and asserts the violation report is still
       printed to stdout
-- [ ] Integration test for `sentinel validate-published` seeds LocalStack with compatible and
+- [x] Integration test for `sentinel validate-published` seeds LocalStack with compatible and
       incompatible contract pairs; asserts the correct exit code and stdout for each case
-- [ ] Integration test for `sentinel validate-published` with `--dry-run`: seeds LocalStack with
+- [x] Integration test for `sentinel validate-published` with `--dry-run`: seeds LocalStack with
       an incompatible pair, asserts exit code is `0`, and asserts the violation report is still
       printed to stdout
-- [ ] `just check` passes
+- [x] `just check` passes
 
 ---
 
@@ -647,6 +648,69 @@ against LocalStack.
 - [ ] Integration test: run `sentinel publish` twice against LocalStack with the same schemas;
       assert that objects are written to the canonical path (`{topic}/{version}/{role}/{repository}_{class_name}.json`),
       exactly one S3 write on the first run and zero on the second (idempotency)
+- [ ] `just check` passes
+
+---
+
+### TICKET-13a — CLI: violation participant context in report output
+
+**Depends on:** TICKET-12
+**Type:** Enhancement
+
+**Goal:**
+Each violation line in `sentinel validate-local` and `sentinel validate-published` output currently
+shows only the field path. When multiple producer/consumer pairs exist for the same topic, it is
+impossible to tell which pair produced a given violation without cross-referencing the schema files
+manually. This ticket threads the participant identity (`repository` + `class_name`) from
+`ContractSchema` through to `Violation` so the rendered report can show it alongside each
+violation.
+
+**Design:**
+
+Add two optional fields to `Violation`:
+
+```python
+@dataclasses.dataclass
+class Violation:
+    ...
+    producer_id: str | None = None  # "{repository}/{class_name}" of the producer schema
+    consumer_id: str | None = None  # "{repository}/{class_name}" of the consumer schema
+```
+
+`validate_pair` (in `engine.py`) receives the root `producer: ContractSchema` and
+`consumer: ContractSchema` objects. It sets `producer_id` and `consumer_id` on every `Violation`
+it creates before returning. Nested violations carry the same IDs (they come from the same pair).
+
+`print_report` in `report.py` renders the IDs when present:
+
+```
+  ✗  orders/1.0.0
+       [CRITICAL] TYPE_MISMATCH @ id  (orders-service/OrderSchema → my-service/OrderSchema)
+       Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.
+```
+
+When both IDs are `None` (e.g. unit tests that construct `Violation` directly), the parenthetical
+is omitted and the line renders exactly as before — no breaking change to existing tests.
+
+**Files to create / modify:**
+- `contract_sentinel/domain/rules/violation.py` — add `producer_id` and `consumer_id` fields
+- `contract_sentinel/domain/rules/engine.py` — thread IDs through `validate_pair`
+- `contract_sentinel/cli/report.py` — render IDs in violation line when present
+- `tests/unit/test_domain/test_rules/test_engine.py` — assert IDs are set on returned violations
+- `tests/unit/test_cli/test_report.py` — add cases asserting the parenthetical renders correctly
+
+**Done when:**
+- [ ] `Violation` gains `producer_id: str | None = None` and `consumer_id: str | None = None`;
+      both fields are included in `to_dict()` when not `None`
+- [ ] `validate_pair` is updated to accept `producer_id` and `consumer_id` as parameters and
+      stamp every `Violation` it creates or recurses into with those values
+- [ ] `validate_group` passes `f"{schema.repository}/{schema.class_name}"` for both IDs when
+      calling `validate_pair` for each producer/consumer combination
+- [ ] `CounterpartMismatchRule` violations carry the ID of the lonely schema in `producer_id`
+      or `consumer_id` as appropriate; the absent side is `None`
+- [ ] `print_report` appends `  ({producer_id} → {consumer_id})` to the violation rule line
+      when both IDs are present; renders nothing extra when either is `None`
+- [ ] All existing tests continue to pass without modification (IDs default to `None`)
 - [ ] `just check` passes
 
 ---

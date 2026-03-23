@@ -3,7 +3,7 @@ name = "contract-sentinel"
 version = "0.1.0"
 description = "Open-source contract testing without a central broker"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["typer>=0.12"]
 
 [project.optional-dependencies]
 s3 = [
@@ -16,6 +16,9 @@ all = [
     "boto3>=1.42.70",
     "marshmallow>=3.13,<4.0",
 ]
+
+[project.scripts]
+sentinel = "contract_sentinel.cli.main:app"
 
 [build-system]
 requires = ["hatchling"]

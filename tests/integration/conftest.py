@@ -35,6 +35,25 @@ def s3_bucket() -> Generator[str, None, None]:
 
 
 @pytest.fixture()
+def cli_env(s3_bucket: str) -> dict[str, str]:
+    """Environment variable overrides for CLI integration tests.
+
+    Wires the CliRunner invocation to the per-test LocalStack bucket so that
+    Config() inside each command handler picks up the correct credentials and
+    bucket name without touching the real environment.
+    """
+    return {
+        "AWS_ACCESS_KEY_ID": "test",
+        "AWS_SECRET_ACCESS_KEY": "test",
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "AWS_ENDPOINT_URL": "http://localstack:4566",
+        "SENTINEL_NAME": "test-repo",
+        "SENTINEL_S3_PATH": "contract_tests",
+        "S3_BUCKET": s3_bucket,
+    }
+
+
+@pytest.fixture()
 def s3_store(s3_bucket: str) -> S3ContractStore:
     """S3ContractStore pointed at the test bucket on LocalStack."""
     return S3ContractStore(
