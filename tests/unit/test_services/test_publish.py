@@ -46,8 +46,8 @@ def _canonical(schema: ContractSchema) -> str:
     return json.dumps(schema.to_dict(), sort_keys=True)
 
 
-def _empty_report() -> dict[str, object]:
-    return {"published": 0, "updated": 0, "unchanged": 0, "failed": []}
+def _empty_report() -> dict[str, list[str]]:
+    return {"published": [], "updated": [], "unchanged": [], "failed": []}
 
 
 def _store(
@@ -101,32 +101,34 @@ class TestFailedPublishToDict:
 
 class TestPublishReportToDict:
     def test_serialises_counts_and_empty_failures(self) -> None:
-        report = PublishReport(published=2, updated=1, unchanged=3, failed=[])
+        report = PublishReport(
+            published=["a", "b"], updated=["c"], unchanged=["d", "e", "f"], failed=[]
+        )
 
         assert report.to_dict() == {
-            "published": 2,
-            "updated": 1,
-            "unchanged": 3,
+            "published": ["a", "b"],
+            "updated": ["c"],
+            "unchanged": ["d", "e", "f"],
             "failed": [],
         }
 
     def test_serialises_failures(self) -> None:
         report = PublishReport(
-            published=0,
-            updated=0,
-            unchanged=0,
+            published=[],
+            updated=[],
+            unchanged=[],
             failed=[FailedPublish(key="orders/1.0.0/producer/svc_Schema.json", reason="timeout")],
         )
 
         assert report.to_dict() == {
-            "published": 0,
-            "updated": 0,
-            "unchanged": 0,
+            "published": [],
+            "updated": [],
+            "unchanged": [],
             "failed": [{"key": "orders/1.0.0/producer/svc_Schema.json", "reason": "timeout"}],
         }
 
     def test_zero_counts(self) -> None:
-        assert PublishReport(published=0, updated=0, unchanged=0, failed=[]).to_dict() == (
+        assert PublishReport(published=[], updated=[], unchanged=[], failed=[]).to_dict() == (
             _empty_report()
         )
 
@@ -156,7 +158,12 @@ class TestPublishContracts:
             config=_config(),
         )
 
-        assert result.to_dict() == {"published": 1, "updated": 0, "unchanged": 0, "failed": []}
+        assert result.to_dict() == {
+            "published": [schema.to_store_key()],
+            "updated": [],
+            "unchanged": [],
+            "failed": [],
+        }
         store.put_file.assert_called_once_with(schema.to_store_key(), _canonical(schema))
 
     def test_does_not_fetch_stored_content_when_key_is_new(self) -> None:
@@ -182,7 +189,12 @@ class TestPublishContracts:
             config=_config(),
         )
 
-        assert result.to_dict() == {"published": 0, "updated": 0, "unchanged": 1, "failed": []}
+        assert result.to_dict() == {
+            "published": [],
+            "updated": [],
+            "unchanged": [schema.to_store_key()],
+            "failed": [],
+        }
         store.put_file.assert_not_called()
 
     def test_updates_contract_when_content_hash_has_changed(self) -> None:
@@ -197,7 +209,12 @@ class TestPublishContracts:
             config=_config(),
         )
 
-        assert result.to_dict() == {"published": 0, "updated": 1, "unchanged": 0, "failed": []}
+        assert result.to_dict() == {
+            "published": [],
+            "updated": [current_schema.to_store_key()],
+            "unchanged": [],
+            "failed": [],
+        }
         store.put_file.assert_called_once_with(
             current_schema.to_store_key(), _canonical(current_schema)
         )
@@ -217,7 +234,12 @@ class TestPublishContracts:
             config=_config(),
         )
 
-        assert result.to_dict() == {"published": 1, "updated": 0, "unchanged": 1, "failed": []}
+        assert result.to_dict() == {
+            "published": [new_schema.to_store_key()],
+            "updated": [],
+            "unchanged": [unchanged_schema.to_store_key()],
+            "failed": [],
+        }
 
     def test_put_file_called_for_each_written_schema(self) -> None:
         s1 = _schema(topic="orders")
@@ -268,9 +290,9 @@ class TestPublishContracts:
         )
 
         assert result.to_dict() == {
-            "published": 0,
-            "updated": 0,
-            "unchanged": 0,
+            "published": [],
+            "updated": [],
+            "unchanged": [],
             "failed": [{"key": schema.to_store_key(), "reason": "S3 unavailable"}],
         }
 
@@ -285,9 +307,9 @@ class TestPublishContracts:
         )
 
         assert result.to_dict() == {
-            "published": 0,
-            "updated": 0,
-            "unchanged": 0,
+            "published": [],
+            "updated": [],
+            "unchanged": [],
             "failed": [{"key": "_MarshmallowClass", "reason": "unsupported field type"}],
         }
         store.put_file.assert_not_called()
@@ -304,9 +326,9 @@ class TestPublishContracts:
         )
 
         assert result.to_dict() == {
-            "published": 0,
-            "updated": 0,
-            "unchanged": 0,
+            "published": [],
+            "updated": [],
+            "unchanged": [],
             "failed": [{"key": "_OtherMarshmallowClass", "reason": "broken schema"}],
         }
         store.put_file.assert_not_called()
@@ -322,9 +344,9 @@ class TestPublishContracts:
         )
 
         assert result.to_dict() == {
-            "published": 0,
-            "updated": 0,
-            "unchanged": 0,
+            "published": [],
+            "updated": [],
+            "unchanged": [],
             "failed": [
                 {"key": "_MarshmallowClass", "reason": "error A"},
                 {"key": "_OtherMarshmallowClass", "reason": "error B"},
@@ -350,8 +372,8 @@ class TestPublishContracts:
         )
 
         assert result.to_dict() == {
-            "published": 1,
-            "updated": 0,
-            "unchanged": 0,
+            "published": [good_schema.to_store_key()],
+            "updated": [],
+            "unchanged": [],
             "failed": [{"key": failing_schema.to_store_key(), "reason": "timeout"}],
         }

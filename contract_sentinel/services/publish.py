@@ -36,16 +36,16 @@ class FailedPublish:
 class PublishReport:
     """Summary of a publish_contracts run.
 
-    published — contracts written for the first time (key did not exist yet).
-    updated   — contracts rewritten because their content hash changed.
-    unchanged   — contracts whose content was identical; no write was made.
+    published — keys of contracts written for the first time (key did not exist yet).
+    updated   — keys of contracts rewritten because their content hash changed.
+    unchanged   — keys of contracts whose content was identical; no write was made.
     failed    — contracts that could not be parsed; no writes were made at all
                 when this list is non-empty (parse phase aborted the write phase).
     """
 
-    published: int
-    updated: int
-    unchanged: int
+    published: list[str]
+    updated: list[str]
+    unchanged: list[str]
     failed: list[FailedPublish]
 
     def to_dict(self) -> dict[str, Any]:
@@ -81,12 +81,9 @@ def publish_contracts(
     if failures:
         for f in failures:
             logger.warning("Parse failed for %s: %s", f.key, f.reason)
-        return PublishReport(published=0, updated=0, unchanged=0, failed=failures)
+        return PublishReport(published=[], updated=[], unchanged=[], failed=failures)
 
     return _write_all(store, contracts)
-
-
-# -- Phase 1 ------------------------------------------------------------------
 
 
 def _parse_all(
@@ -105,17 +102,14 @@ def _parse_all(
     return contracts, failures
 
 
-# -- Phase 2 ------------------------------------------------------------------
-
-
 def _write_all(
     store: ContractStore,
     contracts: list[ContractSchema],
 ) -> PublishReport:
     """Write contracts to the store; catch S3 errors per-key."""
-    published = 0
-    updated = 0
-    unchanged = 0
+    published: list[str] = []
+    updated: list[str] = []
+    unchanged: list[str] = []
     failed: list[FailedPublish] = []
 
     for schema in contracts:
@@ -127,14 +121,14 @@ def _write_all(
             if not store.file_exists(key):
                 store.put_file(key, content)
                 logger.info("Published new contract: %s", key)
-                published += 1
+                published.append(key)
             elif _sha256(store.get_file(key)) != local_hash:
                 store.put_file(key, content)
                 logger.info("Updated contract (hash changed): %s", key)
-                updated += 1
+                updated.append(key)
             else:
                 logger.info("No change, skipping: %s", key)
-                unchanged += 1
+                unchanged.append(key)
         except Exception as exc:
             logger.warning("Failed to write %s: %s", key, exc)
             failed.append(FailedPublish(key=key, reason=str(exc)))
