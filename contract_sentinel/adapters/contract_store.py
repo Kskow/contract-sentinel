@@ -36,6 +36,11 @@ class ContractStore(ABC):
         """Return True if an object exists at *key*, False otherwise."""
         ...
 
+    @abstractmethod
+    def delete_file(self, key: str) -> None:
+        """Permanently remove the object at *key*.  No-op if the key does not exist."""
+        ...
+
 
 class S3ContractStore(ContractStore):
     """ContractStore implementation backed by AWS S3.
@@ -99,6 +104,9 @@ class S3ContractStore(ContractStore):
             if exc.response["Error"]["Code"] == str(HTTPStatus.NOT_FOUND.value):  # type: ignore[attr-defined]
                 return False
             raise
+
+    def delete_file(self, key: str) -> None:
+        self._client.delete_object(Bucket=self._bucket, Key=self._full_key(key))
 
     def _full_key(self, key: str) -> str:
         return f"{self._path}/{key}"

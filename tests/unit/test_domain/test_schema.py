@@ -161,8 +161,7 @@ class TestContractSchema:
             fields=[],
         )
 
-        expected = "orders.created/producer/order-service_OrderSchema.json"
-        assert schema.to_store_key() == expected
+        assert schema.to_store_key() == "orders.created/producer/order-service/OrderSchema.json"
 
     def test_to_store_key_returns_consumer_path(self) -> None:
         schema = ContractSchema(
@@ -174,8 +173,21 @@ class TestContractSchema:
             fields=[],
         )
 
-        expected = "orders.created/consumer/billing-service_InvoiceSchema.json"
-        assert schema.to_store_key() == expected
+        assert schema.to_store_key() == "orders.created/consumer/billing-service/InvoiceSchema.json"
+
+    def test_to_store_key_handles_topic_containing_slashes(self) -> None:
+        schema = ContractSchema(
+            topic="orders/created",
+            role="producer",
+            repository="order-service",
+            class_name="OrderSchema",
+            unknown=UnknownFieldBehaviour.FORBID,
+            fields=[],
+        )
+
+        key = schema.to_store_key()
+
+        assert key == "orders/created/producer/order-service/OrderSchema.json"
 
     def test_to_dict_serialises_all_root_fields_correctly(self) -> None:
         schema = ContractSchema(

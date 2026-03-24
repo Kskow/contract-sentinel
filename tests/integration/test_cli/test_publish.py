@@ -33,6 +33,16 @@ class OrderSchema(ma.Schema):
 """
 
 
+_PRODUCER_SRC_RENAMED = """\
+import marshmallow as ma
+from contract_sentinel import contract, Role
+
+@contract(topic="orders", role=Role.PRODUCER)
+class OrderSchemaV2(ma.Schema):
+    id = ma.fields.Integer(required=True)
+"""
+
+
 _BROKEN_SCHEMA_SRC = """\
 from contract_sentinel import contract, Role
 
@@ -61,13 +71,14 @@ class TestPublishContracts:
             "  Published: 1\n"
             "  Updated:   0\n"
             "  Unchanged: 0\n"
+            "  Pruned:    0\n"
             "  Failed:    0\n"
             "\n  Published schemas:\n"
-            "    ✓ orders/producer/test-repo_OrderSchema.json\n"
+            "    ✓ orders/producer/test-repo/OrderSchema.json\n"
             "\n"
         )
 
-        assert s3_store.file_exists("orders/producer/test-repo_OrderSchema.json")
+        assert s3_store.file_exists("orders/producer/test-repo/OrderSchema.json")
 
     def test_second_run_is_idempotent(
         self,
@@ -86,6 +97,7 @@ class TestPublishContracts:
             "  Published: 0\n"
             "  Updated:   0\n"
             "  Unchanged: 1\n"
+            "  Pruned:    0\n"
             "  Failed:    0\n"
             "\n"
         )
@@ -109,9 +121,10 @@ class TestPublishContracts:
             "  Published: 0\n"
             "  Updated:   1\n"
             "  Unchanged: 0\n"
+            "  Pruned:    0\n"
             "  Failed:    0\n"
             "\n  Updated schemas:\n"
-            "    ↻ orders/producer/test-repo_OrderSchema.json\n"
+            "    ↻ orders/producer/test-repo/OrderSchema.json\n"
             "\n"
         )
 
@@ -133,15 +146,16 @@ class TestPublishContracts:
             "  Published: 0\n"
             "  Updated:   0\n"
             "  Unchanged: 0\n"
+            "  Pruned:    0\n"
             "  Failed:    1\n"
-            "\n  Failed schemas:\n"
-            "    ✗ BrokenSchema\n"
+            "\n  Failed operations:\n"
+            "    ✗ [publish] BrokenSchema\n"
             "      Reason: Cannot detect schema framework for 'BrokenSchema'."
             " Supported frameworks: marshmallow.\n"
             "\n"
         )
 
-        assert not s3_store.file_exists("orders/1.0.0/producer/test-repo_BrokenSchema.json")
+        assert not s3_store.file_exists("orders/producer/test-repo/BrokenSchema.json")
 
     def test_verbose_flag_reveals_unchanged_schemas(
         self,
@@ -163,8 +177,40 @@ class TestPublishContracts:
             "  Published: 0\n"
             "  Updated:   0\n"
             "  Unchanged: 1\n"
+            "  Pruned:    0\n"
             "  Failed:    0\n"
             "\n  Unchanged schemas (skipped):\n"
-            "    - orders/producer/test-repo_OrderSchema.json\n"
+            "    - orders/producer/test-repo/OrderSchema.json\n"
             "\n"
         )
+
+    def test_prune_removes_stale_key_when_class_is_renamed(
+        self,
+        tmp_path: Path,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        schema_file = tmp_path / "schema.py"
+        schema_file.write_text(_PRODUCER_SRC)
+        runner = CliRunner()
+        runner.invoke(app, ["publish-contracts", "--path", str(tmp_path)], env=cli_env)
+
+        schema_file.write_text(_PRODUCER_SRC_RENAMED)
+        result = runner.invoke(app, ["publish-contracts", "--path", str(tmp_path)], env=cli_env)
+
+        assert result.exit_code == 0
+        assert result.output == (
+            "\nContract Publish Summary\n\n"
+            "  Published: 1\n"
+            "  Updated:   0\n"
+            "  Unchanged: 0\n"
+            "  Pruned:    1\n"
+            "  Failed:    0\n"
+            "\n  Published schemas:\n"
+            "    ✓ orders/producer/test-repo/OrderSchemaV2.json\n"
+            "\n  Pruned schemas (class renamed or removed):\n"
+            "    ~ orders/producer/test-repo/OrderSchema.json\n"
+            "\n"
+        )
+        assert not s3_store.file_exists("orders/producer/test-repo/OrderSchema.json")
+        assert s3_store.file_exists("orders/producer/test-repo/OrderSchemaV2.json")

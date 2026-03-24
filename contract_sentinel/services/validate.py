@@ -91,7 +91,7 @@ def _validate_local_contract(store: ContractStore, local_schema: ContractSchema)
 
     counterparts: list[ContractSchema] = []
     for key in store.list_files(f"{local_schema.topic}/"):
-        if f"/{opposite_role.value}/" in key:
+        if key.rsplit("/", 3)[1] == opposite_role.value:
             counterparts.append(ContractSchema.from_dict(json.loads(store.get_file(key))))
 
     pairs = validate_contract([local_schema, *counterparts])
@@ -111,7 +111,7 @@ def validate_published_contracts(
     topic_filter: set[str] = set(topics) if topics is not None else set()
     by_topic: dict[str, list[ContractSchema]] = defaultdict(list)
     for key in store.list_files(""):
-        if topic_filter and key.split("/")[0] not in topic_filter:
+        if topic_filter and key.rsplit("/", 3)[0] not in topic_filter:
             continue
         schema = ContractSchema.from_dict(json.loads(store.get_file(key)))
         by_topic[schema.topic].append(schema)

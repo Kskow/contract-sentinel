@@ -24,7 +24,7 @@ Two external systems are abstracted behind ABCs co-located with their implementa
 ```
 User decorates schema class with @contract(...)
          ↓
-sentinel validate-local / sentinel validate-published / sentinel publish  (CLI entry)
+sentinel validate-local-contracts / sentinel validate-published-contracts / sentinel publish-contracts  (CLI entry)
          ↓
 Load Config (env vars — AWS_*, S3_BUCKET, SENTINEL_* prefix)
          ↓
@@ -115,7 +115,7 @@ tests/
     │   └── test_schema_parser.py
     └── test_cli/
         ├── test_validate.py           ✅
-        └── test_publish.py            ← pending (TICKET-13)
+        └── test_publish.py            ✅
 ```
 
 ### Existing Patterns to Reuse
@@ -343,7 +343,7 @@ dependencies.
 **Done when:**
 - [x] `ContractStore` is an `ABC` with methods: `get_file(key: str) -> str`,
       `put_file(key: str, content: str) -> None`, `list_files(prefix: str) -> list[str]`,
-      `file_exists(key: str) -> bool`
+      `file_exists(key: str) -> bool`, `delete_file(key: str) -> None`
 - [x] `SchemaParser` is an `ABC` with method `parse(cls: type) -> ContractSchema`
 - [x] Both ABCs are importable from their respective modules under `contract_sentinel.ports`
 - [x] `just check` passes
@@ -564,12 +564,18 @@ unchanged ones using SHA-256 content hashing.
       each `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
       S3 object. `parser` and `loader` follow the same conventions as in `validate_local_contracts`
 - [x] The S3 key for every write is `schema.to_store_key()` —
-      `"{topic}/{role}/{repository}_{class_name}.json"`. `ContractSchema.to_store_key()`
+      `"{topic}/{role}/{repository}/{class_name}.json"`. `ContractSchema.to_store_key()`
       is added to `domain/schema.py` and is the single source of truth for the path convention
 - [x] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
       then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
 - [x] `store.put_file()` is **not** called for a schema whose hash matches the current S3 object
-- [x] `publish_contracts` returns a `PublishReport` with counts of `written` and `skipped` schemas
+- [x] `publish_contracts` runs three phases in order: Phase 1 — Parse (all classes parsed before
+      any write; single failure aborts write phase); Phase 2 — Write (SHA-256 hash-gated writes,
+      per-key error collection); Phase 3 — Prune (only when phases 1 and 2 had zero failures —
+      deletes store keys that belong to this repository but are absent from the current scan)
+- [x] `publish_contracts` returns a `PublishReport` with five fields: `published` (new keys),
+      `updated` (hash-changed), `unchanged` (skipped), `pruned` (deleted stale keys),
+      `failed` (parse or store errors with `operation` and `reason`)
 - [x] When a schema does not yet exist in S3 (`store.file_exists(key)` returns `False`), it is
       always written without a hash comparison
 - [x] Unit tests inject `create_autospec(ContractStore)` — no LocalStack required
@@ -584,9 +590,9 @@ unchanged ones using SHA-256 content hashing.
 **Status: ✅ Done**
 
 **Goal:**
-Expose `validate_local_contracts` as `sentinel validate-local` and `validate_published_contracts` as
-`sentinel validate-published`, wire config loading and factory adapter construction, and
-write integration tests against LocalStack.
+Expose `validate_local_contracts` as `sentinel validate-local-contracts` and
+`validate_published_contracts` as `sentinel validate-published-contracts`, wire config loading
+and factory adapter construction, and write integration tests against LocalStack.
 
 **Files to create / modify:**
 - `contract_sentinel/cli/__init__.py` — create (empty)
@@ -603,26 +609,27 @@ write integration tests against LocalStack.
       `sys.path` before scanning, so that app-relative imports (e.g. `from myapp.db import Base`
       inside a schema file's transitive dependencies) resolve correctly when sentinel is run from
       the project root
-- [x] `sentinel validate-local` accepts an optional `--dry-run` flag (default: `False`). When set, the
-      command prints the full violation report to stdout and exits `0` regardless of whether
-      violations were found — no side-effects, no failure signal
-- [x] `sentinel validate-local` calls `validate_local_contracts`, prints the violation report to stdout,
-      exits `1` on violations (unless `--dry-run`), exits `0` on pass
-- [x] `sentinel validate-published` accepts the same `--dry-run` flag with identical semantics
-- [x] `sentinel validate-published` calls `validate_published_contracts`, prints the violation
+- [x] `sentinel validate-local-contracts` accepts an optional `--dry-run` flag (default: `False`).
+      When set, the command prints the full violation report to stdout and exits `0` regardless of
+      whether violations were found — no side-effects, no failure signal
+- [x] `sentinel validate-local-contracts` calls `validate_local_contracts`, prints the violation
       report to stdout, exits `1` on violations (unless `--dry-run`), exits `0` on pass
-- [x] Integration test for `sentinel validate-local` uses `typer.testing.CliRunner` with a real
-      LocalStack bucket pre-seeded with a producer and consumer contract stored at the canonical
-      path (`{topic}/{role}/{repository}_{class_name}.json`); asserts exit code and
+- [x] `sentinel validate-published-contracts` accepts the same `--dry-run` flag with identical
+      semantics
+- [x] `sentinel validate-published-contracts` calls `validate_published_contracts`, prints the
+      violation report to stdout, exits `1` on violations (unless `--dry-run`), exits `0` on pass
+- [x] Integration test for `sentinel validate-local-contracts` uses `typer.testing.CliRunner` with
+      a real LocalStack bucket pre-seeded with a producer and consumer contract stored at the
+      canonical path (`{topic}/{role}/{repository}/{class_name}.json`); asserts exit code and
       stdout content
-- [x] Integration test for `sentinel validate-local` with `--dry-run`: seeds LocalStack with an
-      incompatible pair, asserts exit code is `0`, and asserts the violation report is still
-      printed to stdout
-- [x] Integration test for `sentinel validate-published` seeds LocalStack with compatible and
-      incompatible contract pairs; asserts the correct exit code and stdout for each case
-- [x] Integration test for `sentinel validate-published` with `--dry-run`: seeds LocalStack with
-      an incompatible pair, asserts exit code is `0`, and asserts the violation report is still
-      printed to stdout
+- [x] Integration test for `sentinel validate-local-contracts` with `--dry-run`: seeds LocalStack
+      with an incompatible pair, asserts exit code is `0`, and asserts the violation report is
+      still printed to stdout
+- [x] Integration test for `sentinel validate-published-contracts` seeds LocalStack with compatible
+      and incompatible contract pairs; asserts the correct exit code and stdout for each case
+- [x] Integration test for `sentinel validate-published-contracts` with `--dry-run`: seeds
+      LocalStack with an incompatible pair, asserts exit code is `0`, and asserts the violation
+      report is still printed to stdout
 - [x] `just check` passes
 
 ---
@@ -634,8 +641,8 @@ write integration tests against LocalStack.
 **Status: ✅ Done**
 
 **Goal:**
-Expose `publish_contracts` as the `sentinel publish` CLI command and write the integration test
-against LocalStack.
+Expose `publish_contracts` as the `sentinel publish-contracts` CLI command and write the
+integration test against LocalStack.
 
 **Files to create / modify:**
 - `contract_sentinel/cli/publish.py` — create ✅
@@ -643,19 +650,21 @@ against LocalStack.
 - `tests/integration/test_cli/test_publish.py` — create ✅
 
 **Done when:**
-- [x] `sentinel publish` inserts `str(Path.cwd())` at the front of `sys.path` before scanning
-      (same requirement as TICKET-12 — each command that calls `load_marked_classes` must do this)
-- [x] `sentinel publish` scans, parses, and writes new or changed contracts to S3 using a
-      two-phase approach: all classes are parsed first; if any parse fails the write phase is
-      skipped entirely, preventing partial publishes
-- [x] `sentinel publish` returns a `PublishReport` with four buckets — `published` (new keys),
-      `updated` (hash-changed keys), `unchanged` (skipped), `failed` (parse or write errors) —
-      and prints a structured summary to stdout; `--verbose` reveals unchanged schemas
-- [x] `sentinel publish` exits `0` whether or not any schemas were written
-- [x] Integration test: run `sentinel publish` twice against LocalStack with the same schemas;
-      assert that objects are written to the canonical path (`{topic}/{role}/{repository}_{class_name}.json`),
-      exactly one S3 write on the first run and zero on the second (idempotency). Additional
-      cases cover content-change detection (updated bucket) and `--verbose` output
+- [x] `sentinel publish-contracts` inserts `str(Path.cwd())` at the front of `sys.path` before
+      scanning (same requirement as TICKET-12 — each command that calls `load_marked_classes`
+      must do this)
+- [x] `sentinel publish-contracts` runs three phases: parse all classes first; if any parse fails
+      the write phase is skipped entirely (preventing partial publishes); if write succeeds with
+      zero failures, prune stale store keys belonging to this repository
+- [x] `sentinel publish-contracts` prints a structured summary to stdout with five buckets:
+      `published` (new keys), `updated` (hash-changed), `unchanged` (skipped), `pruned` (deleted
+      stale keys), `failed` (errors); `--verbose` additionally lists unchanged schemas
+- [x] `sentinel publish-contracts` exits `0` whether or not any schemas were written
+- [x] Integration test: run `sentinel publish-contracts` twice against LocalStack with the same
+      schemas; assert that objects are written to the canonical path
+      (`{topic}/{role}/{repository}/{class_name}.json`), exactly one S3 write on the first run
+      and zero on the second (idempotency). Additional cases cover content-change detection
+      (updated bucket), `--verbose` output, parse failure (nothing written), and prune on rename
 - [x] `just check` passes
 
 ---
@@ -738,8 +747,8 @@ users can add their own patterns on top without displacing the built-ins.
 - `contract_sentinel/domain/loader.py` — add `BUILT_IN_EXCLUDE_PATTERNS` constant and `exclude`
   parameter to `load_marked_classes`
 - `contract_sentinel/config.py` — add `exclude` field (user-supplied patterns, default empty)
-- `contract_sentinel/cli/validate.py` — pass `config.exclude` to loader
-- `contract_sentinel/cli/publish.py` — pass `config.exclude` to loader
+- `contract_sentinel/cli/validate.py` — pass `config.exclude` to loader (`sentinel validate-local-contracts`)
+- `contract_sentinel/cli/publish.py` — pass `config.exclude` to loader (`sentinel publish-contracts`)
 - `tests/unit/test_domain/test_loader.py` — extend with exclusion tests
 
 **Design:**

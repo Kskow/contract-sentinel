@@ -55,6 +55,7 @@ def _print_publish_report(report: PublishReport, *, verbose: bool = False) -> No
     typer.echo(f"  Published: {len(report.published)}")
     typer.echo(f"  Updated:   {len(report.updated)}")
     typer.echo(f"  Unchanged: {len(report.unchanged)}")
+    typer.echo(f"  Pruned:    {len(report.pruned)}")
     typer.echo(f"  Failed:    {len(report.failed)}")
 
     if report.published:
@@ -67,10 +68,18 @@ def _print_publish_report(report: PublishReport, *, verbose: bool = False) -> No
         for key in report.updated:
             typer.echo(f"    ↻ {key}")
 
+    if report.pruned:
+        label = typer.style(
+            "\n  Pruned schemas (class renamed or removed):", fg=typer.colors.YELLOW
+        )
+        typer.echo(label)
+        for key in report.pruned:
+            typer.echo(f"    ~ {key}")
+
     if report.failed:
-        typer.echo(typer.style("\n  Failed schemas:", fg=typer.colors.RED))
+        typer.echo(typer.style("\n  Failed operations:", fg=typer.colors.RED))
         for failure in report.failed:
-            typer.echo(f"    ✗ {failure.key}")
+            typer.echo(f"    ✗ [{failure.operation}] {failure.key}")
             typer.echo(f"      Reason: {failure.reason}")
 
     if verbose and report.unchanged:

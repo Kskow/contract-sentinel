@@ -424,6 +424,38 @@ class TestValidateLocalContracts:
             ],
         }
 
+    def test_validates_against_counterpart_when_topic_contains_slashes(self) -> None:
+        producer_schema = _schema(
+            topic="orders/created", role="producer", fields=[_field("id", "string")]
+        )
+        consumer_schema = _schema(
+            topic="orders/created", role="consumer", fields=[_field("id", "string")]
+        )
+
+        result = validate_local_contracts(
+            store=_store(consumer_schema),
+            parser=_parser(producer_schema),
+            loader=lambda: [_MarshmallowClass],
+            config=_config(),
+        )
+
+        assert result.to_dict() == {
+            "status": "PASSED",
+            "reports": [
+                {
+                    "topic": "orders/created",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                }
+            ],
+        }
+
     def test_global_status_is_failed_when_any_group_fails(self) -> None:
         ok_producer = _schema(topic="orders", fields=[_field("id", "string")])
         ok_consumer = _schema(topic="orders", role="consumer", fields=[_field("id", "string")])
@@ -692,5 +724,70 @@ class TestValidatePublishedContracts:
                         }
                     ],
                 },
+            ],
+        }
+
+    def test_topic_filter_works_when_topic_contains_slashes(self) -> None:
+        matching = _schema(topic="orders/created", role="producer")
+        excluded = _schema(topic="payments", role="producer")
+
+        result = validate_published_contracts(
+            store=_store(matching, excluded),
+            topics=["orders/created"],
+        )
+
+        assert result.to_dict() == {
+            "status": "PASSED",
+            "reports": [
+                {
+                    "topic": "orders/created",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": None,
+                            "violations": [
+                                {
+                                    "rule": "COUNTERPART_MISMATCH",
+                                    "severity": "WARNING",
+                                    "field_path": "",
+                                    "producer": {},
+                                    "consumer": {},
+                                    "message": (
+                                        "Topic 'orders/created' has 1 producer(s)"
+                                        " but no matching consumer."
+                                    ),
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+    def test_validates_pair_when_topic_contains_slashes(self) -> None:
+        producer_schema = _schema(
+            topic="orders/created", role="producer", fields=[_field("id", "string")]
+        )
+        consumer_schema = _schema(
+            topic="orders/created", role="consumer", fields=[_field("id", "string")]
+        )
+
+        result = validate_published_contracts(store=_store(producer_schema, consumer_schema))
+
+        assert result.to_dict() == {
+            "status": "PASSED",
+            "reports": [
+                {
+                    "topic": "orders/created",
+                    "status": "PASSED",
+                    "pairs": [
+                        {
+                            "producer_id": "test-repo/OrderSchema",
+                            "consumer_id": "test-repo/OrderSchema",
+                            "violations": [],
+                        }
+                    ],
+                }
             ],
         }

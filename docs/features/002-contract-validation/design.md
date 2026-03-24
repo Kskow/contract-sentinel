@@ -158,23 +158,23 @@ MVP adapter: `Marshmallow3Parser`. Interface is framework-agnostic.
 
 ## 4. Data Storage
 
-**Abstract:** `ContractStore` — `get_file`, `put_file`, `list_files`, `file_exists`
+**Abstract:** `ContractStore` — `get_file`, `put_file`, `list_files`, `file_exists`, `delete_file`
 
 MVP adapter: `S3ContractStore`.
 
 ### S3 Path Convention
 
 ```
-<bucket>/<path>/<topic_name>/<role>/<repository_name>_<class_name>.json
+<bucket>/<path>/<topic>/<role>/<repository>/<class_name>.json
 ```
 
 `<path>` is the `SENTINEL_S3_PATH` env var, defaulting to `"contract_tests"`.
-`<role>` is a directory segment (`producer` or `consumer`), not a filename prefix.
+`<role>` and `<repository>` are directory segments — the filename is `<class_name>.json` only.
 
 Example:
 ```
-my-bucket/contract_tests/orders.created/producer/order-service_OrderSchema.json
-my-bucket/contract_tests/orders.created/consumer/billing-service_InvoiceSchema.json
+my-bucket/contract_tests/orders.created/producer/order-service/OrderSchema.json
+my-bucket/contract_tests/orders.created/consumer/billing-service/InvoiceSchema.json
 ```
 
 `ContractSchema.to_store_key()` is the single source of truth for constructing the
@@ -305,7 +305,7 @@ Each rule self-determines its behaviour based on which side is `None`:
 
 ## 6. CLI Commands
 
-### `sentinel validate` — PR gate
+### `sentinel validate-local-contracts` — PR gate
 
 Calls `validate_local_contracts(store, parser, loader, config)`.
 
@@ -326,7 +326,7 @@ Calls `validate_local_contracts(store, parser, loader, config)`.
 Total Violations: 2
 ```
 
-### `sentinel validate-published` — S3 audit
+### `sentinel validate-published-contracts` — S3 audit
 
 Calls `validate_published_contracts(store, topics=None)`.
 
@@ -339,14 +339,24 @@ Calls `validate_published_contracts(store, topics=None)`.
 No local schema scan is performed. Intended as a scheduled cross-service consistency
 check or for environments where the local codebase is not available.
 
-### `sentinel publish` — post-merge
+### `sentinel publish-contracts` — post-merge
 
-1. Load config.
-2. Scan and parse local schemas.
-3. SHA-256 hash each canonical JSON (keys sorted).
-4. Compare against current S3 object hash.
-5. Write to S3 only if hash differs; log "no change, skipping" otherwise.
-6. Exit `0` always.
+Three phases run in order; a failure in any phase prevents later phases from running.
+
+**Phase 1 — Parse:** All classes are parsed before any write. A single parse failure aborts
+the entire run, returning a report with `failed` entries and leaving S3 untouched.
+
+**Phase 2 — Write:** SHA-256 hash each canonical JSON (`sort_keys=True`). Compare against
+the stored object. Write to S3 only if the key is new or the hash has changed; skip otherwise.
+Write errors are caught per-key — the phase is best-effort (S3 has no multi-key atomicity).
+
+**Phase 3 — Prune:** Only runs when both Phase 1 and Phase 2 had zero failures (i.e. the local
+scan is trusted as complete). Any S3 key that belongs to this repository but was not produced
+by the current scan is deleted — it represents a class that was renamed or removed. Scoped
+strictly to keys whose third path segment matches the current `SENTINEL_NAME`.
+
+Returns a `PublishReport` with four buckets: `published` (new keys), `updated` (hash-changed),
+`unchanged` (skipped), `pruned` (deleted), plus `failed` (errors). Exits `0` always.
 
 
 ---

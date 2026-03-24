@@ -67,8 +67,9 @@ contracts in their own S3 bucket, and validate compatibility automatically on ev
 4. A Marshmallow schema is parsed into a `ContractSchema` value object with correct `name`, `type`,
    `is_required`, `is_nullable`, `default`, `metadata`, and nested `fields` for each field.
 
-5. `sentinel publish` writes a canonical JSON contract file to S3 at the path
-   `contract_tests/<topic>/<role>/<repo>_<class>.json`.
+5. `sentinel publish-contracts` writes a canonical JSON contract file to S3 at the key
+   `<topic>/<role>/<repo>/<class>.json` (the `SENTINEL_S3_PATH` prefix is prepended by
+   `S3ContractStore` and never appears in the relative key exposed to callers).
 
 6. `sentinel publish` is idempotent: running it twice on an unchanged schema produces exactly one
    S3 write (on the first run) and zero writes on the second.
@@ -79,8 +80,8 @@ contracts in their own S3 bucket, and validate compatibility automatically on ev
 8. `sentinel validate` exits `0` and prints a passing summary when all contracts on all topics are
    compatible.
 
-9. `sentinel validate --skip-scan` compares contracts already stored in S3 without scanning or
-   parsing local files.
+9. `sentinel validate-published-contracts` compares contracts already stored in S3 without
+   scanning or parsing local files.
 
 10. Supplying `framework = "unsupported"` or `storage.type = "unsupported"` in `pyproject.toml`
     raises a typed domain error with a message that lists the valid options.

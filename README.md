@@ -75,11 +75,11 @@ contract_sentinel/
 │   └── schema_parser.py    # SchemaParser(ABC)  + Marshmallow3Parser
 ├── services/           # Use-case orchestration
 │   ├── validate.py     # validate_local_contracts, validate_published_contracts
-│   └── publish.py      # publish_contracts — idempotent SHA-256 hash-gated writes
+│   └── publish.py      # publish_contracts — 3-phase (parse → write → prune), SHA-256 hash-gated
 └── cli/                # Typer CLI entrypoints (wired as `sentinel` script)
     ├── main.py         # Typer app entry-point
-    ├── validate.py     # sentinel validate-local / sentinel validate-published
-    └── publish.py      # sentinel publish
+    ├── validate.py     # sentinel validate-local-contracts / sentinel validate-published-contracts
+    └── publish.py      # sentinel publish-contracts
 
 tests/
 ├── unit/

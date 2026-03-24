@@ -4,6 +4,7 @@ import dataclasses
 import hashlib
 import json
 import logging
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.framework import detect_framework
@@ -21,15 +22,21 @@ if TYPE_CHECKING:
     from contract_sentinel.domain.schema import ContractSchema
 
 
-@dataclasses.dataclass
-class FailedPublish:
-    """A contract that could not be published, with the reason why."""
+class OperationKind(StrEnum):
+    PUBLISH = "publish"
+    PRUNE = "prune"
 
-    key: str  # S3 key, or class name if failure occurred before parsing
-    reason: str  # str(exception)
+
+@dataclasses.dataclass
+class FailedOperation:
+    """A publish or prune operation that failed, with the key and reason."""
+
+    operation: OperationKind
+    key: str
+    reason: str
 
     def to_dict(self) -> dict[str, str]:
-        return {"key": self.key, "reason": self.reason}
+        return {"operation": self.operation, "key": self.key, "reason": self.reason}
 
 
 @dataclasses.dataclass
@@ -38,21 +45,26 @@ class PublishReport:
 
     published — keys of contracts written for the first time (key did not exist yet).
     updated   — keys of contracts rewritten because their content hash changed.
-    unchanged   — keys of contracts whose content was identical; no write was made.
-    failed    — contracts that could not be parsed; no writes were made at all
-                when this list is non-empty (parse phase aborted the write phase).
+    unchanged — keys of contracts whose content was identical; no write was made.
+    pruned    — keys deleted from the store because they belong to this repository
+                but were not found in the current local scan (renamed / removed class).
+    failed    — operations (publish or prune) that raised an exception.  Parse
+                failures abort the write phase entirely; write/prune failures are
+                collected per-key and the run continues.
     """
 
     published: list[str]
     updated: list[str]
     unchanged: list[str]
-    failed: list[FailedPublish]
+    pruned: list[str]
+    failed: list[FailedOperation]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "published": self.published,
             "updated": self.updated,
             "unchanged": self.unchanged,
+            "pruned": self.pruned,
             "failed": [f.to_dict() for f in self.failed],
         }
 
@@ -63,7 +75,7 @@ def publish_contracts(
     loader: Callable[[], list[type]],
     config: Config,
 ) -> PublishReport:
-    """Publish local schemas to the store in two distinct phases.
+    """Publish local schemas to the store in three distinct phases.
 
     Phase 1 — Parse: every class is parsed before anything is written.
     If any class fails (unsupported framework, missing extra, broken schema),
@@ -75,29 +87,45 @@ def publish_contracts(
     only when the key is new or the content has changed.  S3 errors here are
     caught per-key and collected in the report — the write phase is best-effort
     because S3 offers no multi-object atomicity.
+
+    Phase 3 — Prune: only reached when both Phase 1 and Phase 2 had zero
+    failures, meaning the local scan is trusted as complete.  Any store key
+    that (a) belongs to this repository and (b) was not produced by the
+    current scan is deleted — it represents a class that was renamed or
+    removed.  Pruning is scoped strictly to ``{repository}_*.json`` filenames
+    so it never touches contracts owned by other repositories.
     """
     contracts, failures = _parse_all(loader, parser, config)
     if failures:
         for f in failures:
             logger.warning("Parse failed for %s: %s", f.key, f.reason)
-        return PublishReport(published=[], updated=[], unchanged=[], failed=failures)
+        return PublishReport(published=[], updated=[], unchanged=[], pruned=[], failed=failures)
 
-    return _write_all(store, contracts)
+    report = _write_all(store, contracts)
+
+    if not report.failed:
+        pruned, prune_failures = _prune_stale(store, report, config.name)
+        report.pruned = pruned
+        report.failed.extend(prune_failures)
+
+    return report
 
 
 def _parse_all(
     loader: Callable[[], list[type]],
     parser: Callable[[Framework, str], SchemaParser],
     config: Config,
-) -> tuple[list[ContractSchema], list[FailedPublish]]:
+) -> tuple[list[ContractSchema], list[FailedOperation]]:
     """Parse every discovered class; collect all errors rather than failing fast."""
     contracts: list[ContractSchema] = []
-    failures: list[FailedPublish] = []
+    failures: list[FailedOperation] = []
     for cls in loader():
         try:
             contracts.append(parser(detect_framework(cls), config.name).parse(cls))
         except Exception as exc:
-            failures.append(FailedPublish(key=cls.__name__, reason=str(exc)))
+            failures.append(
+                FailedOperation(operation=OperationKind.PUBLISH, key=cls.__name__, reason=str(exc))
+            )
     return contracts, failures
 
 
@@ -109,7 +137,7 @@ def _write_all(
     published: list[str] = []
     updated: list[str] = []
     unchanged: list[str] = []
-    failed: list[FailedPublish] = []
+    failed: list[FailedOperation] = []
 
     for schema in contracts:
         key = schema.to_store_key()
@@ -130,9 +158,39 @@ def _write_all(
                 unchanged.append(key)
         except Exception as exc:
             logger.warning("Failed to write %s: %s", key, exc)
-            failed.append(FailedPublish(key=key, reason=str(exc)))
+            failed.append(
+                FailedOperation(operation=OperationKind.PUBLISH, key=key, reason=str(exc))
+            )
 
-    return PublishReport(published=published, updated=updated, unchanged=unchanged, failed=failed)
+    return PublishReport(
+        published=published, updated=updated, unchanged=unchanged, pruned=[], failed=failed
+    )
+
+
+def _prune_stale(
+    store: ContractStore,
+    report: PublishReport,
+    repository: str,
+) -> tuple[list[str], list[FailedOperation]]:
+    """Delete store keys that belong to this repository but are absent from the current scan."""
+    current_keys: set[str] = set(report.published + report.updated + report.unchanged)
+
+    pruned: list[str] = []
+    failures: list[FailedOperation] = []
+    for key in store.list_files(""):
+        parts = key.rsplit("/", 3)
+        if len(parts) == 4 and parts[2] == repository and key not in current_keys:
+            try:
+                store.delete_file(key)
+                logger.info("Pruned stale contract: %s", key)
+                pruned.append(key)
+            except Exception as exc:
+                logger.warning("Failed to prune %s: %s", key, exc)
+                failures.append(
+                    FailedOperation(operation=OperationKind.PRUNE, key=key, reason=str(exc))
+                )
+
+    return pruned, failures
 
 
 def _sha256(content: str) -> str:
