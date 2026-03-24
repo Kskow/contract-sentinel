@@ -9,12 +9,11 @@ if TYPE_CHECKING:
 
 
 class ContractStore(ABC):
-    """Abstract store for reading and writing versioned contract documents.
+    """Abstract store for reading and writing contract documents.
 
     All keys are relative — implementations are responsible for any path
     prefixing. ``list_files`` returns keys ordered by recency (newest first)
-    so callers can take the first element to resolve the latest contract
-    without version parsing.
+    so callers can take the first element to resolve the latest contract.
     """
 
     @abstractmethod

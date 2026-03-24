@@ -134,7 +134,6 @@ class Marshmallow3Parser(SchemaParser):
         return ContractSchema(
             topic=meta.topic,
             role=meta.role.value,
-            version=meta.version,
             repository=self._repository,
             class_name=cls.__name__,
             unknown=unknown,

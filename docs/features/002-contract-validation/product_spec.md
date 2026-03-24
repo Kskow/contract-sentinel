@@ -14,17 +14,17 @@ Pact Broker. Breaking schema changes (renamed fields, type changes, removed requ
 undetected until runtime, causing production incidents.
 
 Contract Sentinel solves this by letting teams mark their schema classes directly in code, store
-versioned contracts in their own S3 bucket, and validate compatibility automatically on every PR.
+contracts in their own S3 bucket, and validate compatibility automatically on every PR.
 
 ---
 
 ## Goals
 
-- Let developers mark any Marshmallow schema class with a decorator that declares its topic, role
-  (producer / consumer), and version.
+- Let developers mark any Marshmallow schema class with a decorator that declares its topic and
+  role (producer / consumer).
 - Scan a repository at runtime to discover all marked schema classes under a configured path.
 - Parse Marshmallow schemas into a canonical, framework-agnostic JSON contract format.
-- Store and retrieve versioned contract files in S3 so producer and consumer services can exchange
+- Store and retrieve contract files in S3 so producer and consumer services can exchange
   contracts without sharing a codebase.
 - Validate producer–consumer contract compatibility using the following rules: `TYPE_MISMATCH`,
   `REQUIREMENT_MISMATCH`, `NULLABILITY_MISMATCH`, `MISSING_FIELD`, `UNDECLARED_FIELD`,
@@ -55,8 +55,8 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
 
 ## Acceptance Criteria
 
-1. A class decorated with `@contract(topic="orders.created", role=Role.PRODUCER,
-   version="1.0.0")` has a `__contract__` attribute containing the correct metadata.
+1. A class decorated with `@contract(topic="orders.created", role=Role.PRODUCER)` has a
+   `__contract__` attribute containing the correct metadata.
 
 2. The Loader discovers all marked classes under a configured path and returns their metadata;
    classes without the decorator are ignored.
@@ -68,7 +68,7 @@ versioned contracts in their own S3 bucket, and validate compatibility automatic
    `is_required`, `is_nullable`, `default`, `metadata`, and nested `fields` for each field.
 
 5. `sentinel publish` writes a canonical JSON contract file to S3 at the path
-   `contract_tests/<topic>/<version>/<role>_<repo>_<class>.json`.
+   `contract_tests/<topic>/<role>/<repo>_<class>.json`.
 
 6. `sentinel publish` is idempotent: running it twice on an unchanged schema produces exactly one
    S3 write (on the first run) and zero writes on the second.

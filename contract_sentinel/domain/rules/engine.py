@@ -62,7 +62,7 @@ def _validate_group(
     producers: list[ContractSchema],
     consumers: list[ContractSchema],
 ) -> list[PairViolations]:
-    """Validate a whole group of producers and consumers for one (topic, version) pair.
+    """Validate a whole group of producers and consumers for topic.
 
     Checks if counterparts exist (e.g. at least one producer for consumers).
     If a schema is 'lonely', returns a single PairViolations with the absent side set

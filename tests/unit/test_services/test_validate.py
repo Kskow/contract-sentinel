@@ -39,13 +39,11 @@ def _schema(
     *,
     topic: str = "orders",
     role: str = "producer",
-    version: str = "1.0.0",
     fields: list[ContractField] | None = None,
 ) -> ContractSchema:
     return ContractSchema(
         topic=topic,
         role=role,
-        version=version,
         repository="test-repo",
         class_name="OrderSchema",
         unknown=UnknownFieldBehaviour.FORBID,
@@ -89,13 +87,10 @@ def _config(name: str = "test-repo") -> MagicMock:
 
 class TestContractReportToDict:
     def test_serialises_empty_pairs(self) -> None:
-        report = ContractReport(
-            topic="orders", version="1.0.0", status=ValidationStatus.PASSED, pairs=[]
-        )
+        report = ContractReport(topic="orders", status=ValidationStatus.PASSED, pairs=[])
 
         assert report.to_dict() == {
             "topic": "orders",
-            "version": "1.0.0",
             "status": "PASSED",
             "pairs": [],
         }
@@ -103,7 +98,6 @@ class TestContractReportToDict:
     def test_serialises_pairs_with_violations(self) -> None:
         report = ContractReport(
             topic="orders",
-            version="1.0.0",
             status=ValidationStatus.FAILED,
             pairs=[
                 PairViolations(
@@ -128,7 +122,6 @@ class TestContractReportToDict:
 
         assert report.to_dict() == {
             "topic": "orders",
-            "version": "1.0.0",
             "status": "FAILED",
             "pairs": [
                 {
@@ -164,7 +157,6 @@ class TestContractsValidationReportToDict:
             reports=[
                 ContractReport(
                     topic="orders",
-                    version="1.0.0",
                     status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
@@ -194,7 +186,6 @@ class TestContractsValidationReportToDict:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "FAILED",
                     "pairs": [
                         {
@@ -247,7 +238,6 @@ class TestValidateLocalContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -276,7 +266,6 @@ class TestValidateLocalContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "FAILED",
                     "pairs": [
                         {
@@ -302,7 +291,7 @@ class TestValidateLocalContracts:
         }
 
     def test_returns_passed_when_warning_severity_rule_found(self) -> None:
-        producer_schema = _schema(role="producer", topic="orders", version="1.0.0")
+        producer_schema = _schema(role="producer", topic="orders")
 
         result = validate_local_contracts(
             store=_store(),
@@ -316,7 +305,6 @@ class TestValidateLocalContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -330,8 +318,7 @@ class TestValidateLocalContracts:
                                     "producer": {},
                                     "consumer": {},
                                     "message": (
-                                        "Topic 'orders' version '1.0.0' has 1 producer(s)"
-                                        " but no matching consumer."
+                                        "Topic 'orders' has 1 producer(s) but no matching consumer."
                                     ),
                                 }
                             ],
@@ -375,9 +362,9 @@ class TestValidateLocalContracts:
             )
         ]
 
-    def test_produces_separate_reports_for_different_groups(self) -> None:
-        s1 = _schema(topic="orders", version="1.0.0", role="producer")
-        s2 = _schema(topic="orders", version="2.0.0", role="producer")
+    def test_produces_separate_report_per_topic(self) -> None:
+        s1 = _schema(topic="orders", role="producer")
+        s2 = _schema(topic="payments", role="producer")
 
         result = validate_local_contracts(
             store=_store(),
@@ -391,7 +378,6 @@ class TestValidateLocalContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -405,8 +391,7 @@ class TestValidateLocalContracts:
                                     "producer": {},
                                     "consumer": {},
                                     "message": (
-                                        "Topic 'orders' version '1.0.0' has 1 producer(s)"
-                                        " but no matching consumer."
+                                        "Topic 'orders' has 1 producer(s) but no matching consumer."
                                     ),
                                 }
                             ],
@@ -414,8 +399,7 @@ class TestValidateLocalContracts:
                     ],
                 },
                 {
-                    "topic": "orders",
-                    "version": "2.0.0",
+                    "topic": "payments",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -429,7 +413,7 @@ class TestValidateLocalContracts:
                                     "producer": {},
                                     "consumer": {},
                                     "message": (
-                                        "Topic 'orders' version '2.0.0' has 1 producer(s)"
+                                        "Topic 'payments' has 1 producer(s)"
                                         " but no matching consumer."
                                     ),
                                 }
@@ -461,7 +445,6 @@ class TestValidateLocalContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -473,7 +456,6 @@ class TestValidateLocalContracts:
                 },
                 {
                     "topic": "payments",
-                    "version": "1.0.0",
                     "status": "FAILED",
                     "pairs": [
                         {
@@ -516,7 +498,6 @@ class TestValidatePublishedContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -540,7 +521,6 @@ class TestValidatePublishedContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "FAILED",
                     "pairs": [
                         {
@@ -566,7 +546,7 @@ class TestValidatePublishedContracts:
         }
 
     def test_returns_passed_warning_severity_found(self) -> None:
-        producer_schema = _schema(role="producer", topic="orders", version="1.0.0")
+        producer_schema = _schema(role="producer", topic="orders")
 
         result = validate_published_contracts(store=_store(producer_schema))
 
@@ -575,7 +555,6 @@ class TestValidatePublishedContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -589,8 +568,7 @@ class TestValidatePublishedContracts:
                                     "producer": {},
                                     "consumer": {},
                                     "message": (
-                                        "Topic 'orders' version '1.0.0' has 1 producer(s)"
-                                        " but no matching consumer."
+                                        "Topic 'orders' has 1 producer(s) but no matching consumer."
                                     ),
                                 }
                             ],
@@ -627,12 +605,12 @@ class TestValidatePublishedContracts:
             )
         ]
 
-    def test_produces_separate_reports_for_different_groups(self) -> None:
+    def test_produces_separate_report_per_topic(self) -> None:
         store = _store(
-            _schema(topic="orders", version="1.0.0", role="producer"),
-            _schema(topic="orders", version="1.0.0", role="consumer"),
-            _schema(topic="orders", version="2.0.0", role="producer"),
-            _schema(topic="orders", version="2.0.0", role="consumer"),
+            _schema(topic="orders", role="producer"),
+            _schema(topic="orders", role="consumer"),
+            _schema(topic="payments", role="producer"),
+            _schema(topic="payments", role="consumer"),
         )
 
         result = validate_published_contracts(store=store)
@@ -642,7 +620,6 @@ class TestValidatePublishedContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -653,8 +630,7 @@ class TestValidatePublishedContracts:
                     ],
                 },
                 {
-                    "topic": "orders",
-                    "version": "2.0.0",
+                    "topic": "payments",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -671,10 +647,10 @@ class TestValidatePublishedContracts:
         ok_fields = [_field("id", "string")]
         bad_fields = [_field("id", "integer")]
         store = _store(
-            _schema(topic="orders", version="1.0.0", role="producer", fields=ok_fields),
-            _schema(topic="orders", version="1.0.0", role="consumer", fields=ok_fields),
-            _schema(topic="payments", version="1.0.0", role="producer", fields=ok_fields),
-            _schema(topic="payments", version="1.0.0", role="consumer", fields=bad_fields),
+            _schema(topic="orders", role="producer", fields=ok_fields),
+            _schema(topic="orders", role="consumer", fields=ok_fields),
+            _schema(topic="payments", role="producer", fields=ok_fields),
+            _schema(topic="payments", role="consumer", fields=bad_fields),
         )
 
         result = validate_published_contracts(store=store)
@@ -684,7 +660,6 @@ class TestValidatePublishedContracts:
             "reports": [
                 {
                     "topic": "orders",
-                    "version": "1.0.0",
                     "status": "PASSED",
                     "pairs": [
                         {
@@ -696,7 +671,6 @@ class TestValidatePublishedContracts:
                 },
                 {
                     "topic": "payments",
-                    "version": "1.0.0",
                     "status": "FAILED",
                     "pairs": [
                         {

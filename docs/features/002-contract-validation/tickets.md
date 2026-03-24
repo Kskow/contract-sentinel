@@ -132,9 +132,9 @@ tests/
   every merge.
 - **Version resolution:** `S3ContractStore.list(prefix)` returns keys sorted by `LastModified`
   descending — the first result is always the latest contract. No version string parsing needed.
-- **Multi-producer:** The service layer fetches all objects under
-  `contract_tests/<topic>/` and groups them by role. Each consumer is validated against every
-  producer. Failure of any pair fails the run.
+- **Multi-producer:** The service layer fetches all objects under `contract_tests/<topic>/` and
+  groups them by role. Each consumer is validated against every producer on that topic.
+  Failure of any pair fails the run.
 
 ### IAM / Environment Variables Required
 
@@ -200,9 +200,9 @@ classes.
 
 **Done when:**
 - [x] `Role` enum has exactly two members: `PRODUCER` and `CONSUMER`
-- [x] `@contract(topic="t", role=Role.PRODUCER, version="1.0.0")` sets
+- [x] `@contract(topic="t", role=Role.PRODUCER)` sets
       `__contract__` on the decorated class
-- [x] `__contract__` contains the exact `topic`, `role`, and `version` values
+- [x] `__contract__` contains the exact `topic` and `role` values
 - [x] Applying the decorator to a class does not alter any other class attribute
 - [x] `contract_sentinel/__init__.py` exports `contract` and `Role` in `__all__` —
       these are the only public API symbols users need to import
@@ -236,7 +236,7 @@ exchanges, plus the typed domain errors used by the factory.
       `dict[str, Any]` for type-specific extras), `unknown` (`UnknownFieldBehaviour | None` —
       only populated when `type == "object"`, carries the nested schema's own policy), `values`
       (optional sequence of allowed enum member values — populated only for enum fields)
-- [x] `ContractSchema` is a dataclass with fields: `topic`, `role`, `version`, `repository`,
+- [x] `ContractSchema` is a dataclass with fields: `topic`, `role`, `repository`,
       `class_name`, `unknown` (`UnknownFieldBehaviour`), `fields` (list of `ContractField`) —
       no default values; always constructed with explicit arguments
 - [x] `ContractSchema` can be serialised to a dict and round-tripped back without data loss
@@ -520,8 +520,7 @@ and `validate_published_contracts` (S3 audit — store-only), both returning a s
 
 **Done when:**
 - [x] `ValidationStatus` is a `StrEnum` with members `PASSED` and `FAILED`
-- [x] `ContractReport` dataclass holds `topic`, `version`, `status`, and `violations` for a
-      single `(topic, version)` pair
+- [x] `ContractReport` dataclass holds `topic`, `status`, and `violations` for a single topic
 - [x] `ContractsValidationReport` dataclass holds a global `status` and a `reports: list[ContractReport]`;
       status is `FAILED` if any `ContractReport` is `FAILED`
 - [x] `validate_local_contracts(store, parser, loader, config, topics=None)` returns a
@@ -533,11 +532,10 @@ and `validate_published_contracts` (S3 audit — store-only), both returning a s
       then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
 - [x] Returns `status=ValidationStatus.FAILED` with the correct `Violation` objects when a
       breaking rule fires; a violation in any pair sets the status to `FAILED`
-- [x] Each local schema is validated only against counterparts of the opposite role and the
-      same version fetched from the store — counterparts are filtered by `/{version}/` and
-      `/{role}/` in the key
+- [x] Each local schema is validated only against counterparts of the opposite role fetched from
+      the store — counterparts are filtered by `/{role}/` in the key
 - [x] `validate_published_contracts(store, topics=None)` fetches all contracts in a single
-      `store.list_files("")` call, groups by `(topic, version)` in memory, and validates every
+      `store.list_files("")` call, groups by `topic` in memory, and validates every
       `(producer, consumer)` pair. When `topics` is set, keys whose topic prefix is not in the
       list are skipped before fetching the file
 - [x] Both functions emit a `logger.warning` for each requested topic that yields no schemas
@@ -566,7 +564,7 @@ unchanged ones using SHA-256 content hashing.
       each `ContractSchema` whose SHA-256 hash (of `sort_keys=True` JSON) differs from the current
       S3 object. `parser` and `loader` follow the same conventions as in `validate_local_contracts`
 - [x] The S3 key for every write is `schema.to_store_key()` —
-      `"{topic}/{version}/{role}/{repository}_{class_name}.json"`. `ContractSchema.to_store_key()`
+      `"{topic}/{role}/{repository}_{class_name}.json"`. `ContractSchema.to_store_key()`
       is added to `domain/schema.py` and is the single source of truth for the path convention
 - [x] For each discovered class, `detect_framework(cls)` is called to resolve the framework,
       then `parser(framework, config.name)` is invoked to obtain the correct `SchemaParser`
@@ -615,7 +613,7 @@ write integration tests against LocalStack.
       report to stdout, exits `1` on violations (unless `--dry-run`), exits `0` on pass
 - [x] Integration test for `sentinel validate-local` uses `typer.testing.CliRunner` with a real
       LocalStack bucket pre-seeded with a producer and consumer contract stored at the canonical
-      path (`{topic}/{version}/{role}/{repository}_{class_name}.json`); asserts exit code and
+      path (`{topic}/{role}/{repository}_{class_name}.json`); asserts exit code and
       stdout content
 - [x] Integration test for `sentinel validate-local` with `--dry-run`: seeds LocalStack with an
       incompatible pair, asserts exit code is `0`, and asserts the violation report is still
@@ -655,7 +653,7 @@ against LocalStack.
       and prints a structured summary to stdout; `--verbose` reveals unchanged schemas
 - [x] `sentinel publish` exits `0` whether or not any schemas were written
 - [x] Integration test: run `sentinel publish` twice against LocalStack with the same schemas;
-      assert that objects are written to the canonical path (`{topic}/{version}/{role}/{repository}_{class_name}.json`),
+      assert that objects are written to the canonical path (`{topic}/{role}/{repository}_{class_name}.json`),
       exactly one S3 write on the first run and zero on the second (idempotency). Additional
       cases cover content-change detection (updated bucket) and `--verbose` output
 - [x] `just check` passes
@@ -695,7 +693,7 @@ it creates before returning. Nested violations carry the same IDs (they come fro
 `print_report` in `report.py` renders the IDs when present:
 
 ```
-  ✗  orders/1.0.0
+  ✗  orders
        [CRITICAL] TYPE_MISMATCH @ id  (orders-service/OrderSchema → my-service/OrderSchema)
        Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.
 ```

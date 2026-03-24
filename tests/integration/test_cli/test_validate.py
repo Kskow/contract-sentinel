@@ -28,7 +28,6 @@ def _producer(field_type: str = "integer") -> ContractSchema:
     return ContractSchema(
         topic="orders",
         role="producer",
-        version="1.0.0",
         repository="orders-service",
         class_name="OrderProducerSchema",
         unknown=UnknownFieldBehaviour.FORBID,
@@ -40,7 +39,6 @@ def _consumer() -> ContractSchema:
     return ContractSchema(
         topic="orders",
         role="consumer",
-        version="1.0.0",
         repository="test-repo",
         class_name="OrderConsumerSchema",
         unknown=UnknownFieldBehaviour.FORBID,
@@ -59,7 +57,7 @@ _LOCAL_CONSUMER_SRC = """\
 import marshmallow as ma
 from contract_sentinel import contract, Role
 
-@contract(topic="orders", role=Role.CONSUMER, version="1.0.0")
+@contract(topic="orders", role=Role.CONSUMER)
 class OrderConsumerSchema(ma.Schema):
     id = ma.fields.Integer(required=True)
 """
@@ -72,7 +70,6 @@ class TestPrintReport:
             reports=[
                 ContractReport(
                     topic="orders",
-                    version="1.0.0",
                     status=ValidationStatus.PASSED,
                     pairs=[
                         PairViolations(
@@ -92,7 +89,7 @@ class TestPrintReport:
         assert buf.getvalue() == (
             "\nContract Validation — PASSED\n"
             "\n"
-            "  ✓  orders/1.0.0\n"
+            "  ✓  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "\n"
         )
@@ -103,7 +100,6 @@ class TestPrintReport:
             reports=[
                 ContractReport(
                     topic="orders",
-                    version="1.0.0",
                     status=ValidationStatus.PASSED,
                     pairs=[],
                 )
@@ -122,7 +118,6 @@ class TestPrintReport:
             reports=[
                 ContractReport(
                     topic="orders",
-                    version="1.0.0",
                     status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
@@ -154,7 +149,7 @@ class TestPrintReport:
         assert buf.getvalue() == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✗  orders/1.0.0\n"
+            "  ✗  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
@@ -167,7 +162,6 @@ class TestPrintReport:
             reports=[
                 ContractReport(
                     topic="orders",
-                    version="1.0.0",
                     status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
@@ -210,7 +204,7 @@ class TestPrintReport:
         assert buf.getvalue() == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✗  orders/1.0.0\n"
+            "  ✗  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
@@ -225,7 +219,6 @@ class TestPrintReport:
             reports=[
                 ContractReport(
                     topic="orders",
-                    version="1.0.0",
                     status=ValidationStatus.PASSED,
                     pairs=[
                         PairViolations(
@@ -237,7 +230,6 @@ class TestPrintReport:
                 ),
                 ContractReport(
                     topic="payments",
-                    version="2.0.0",
                     status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
@@ -269,9 +261,9 @@ class TestPrintReport:
         assert buf.getvalue() == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✓  orders/1.0.0\n"
+            "  ✓  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
-            "  ✗  payments/2.0.0\n"
+            "  ✗  payments\n"
             "       payments-service/PaymentProducerSchema vs test-repo/PaymentConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
@@ -322,7 +314,7 @@ class TestValidateLocal:
         assert result.output == (
             "\nContract Validation — PASSED\n"
             "\n"
-            "  ✓  orders/1.0.0\n"
+            "  ✓  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "\n"
         )
@@ -344,7 +336,7 @@ class TestValidateLocal:
         assert result.output == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✗  orders/1.0.0\n"
+            "  ✗  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
@@ -368,7 +360,7 @@ class TestValidateLocal:
         assert result.output == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✗  orders/1.0.0\n"
+            "  ✗  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
@@ -402,7 +394,7 @@ class TestValidatePublished:
         assert result.output == (
             "\nContract Validation — PASSED\n"
             "\n"
-            "  ✓  orders/1.0.0\n"
+            "  ✓  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "\n"
         )
@@ -420,7 +412,7 @@ class TestValidatePublished:
         assert result.output == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✗  orders/1.0.0\n"
+            "  ✗  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
@@ -440,7 +432,7 @@ class TestValidatePublished:
         assert result.output == (
             "\nContract Validation — FAILED\n"
             "\n"
-            "  ✗  orders/1.0.0\n"
+            "  ✗  orders\n"
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"

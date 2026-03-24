@@ -16,7 +16,7 @@ _PRODUCER_SRC = """\
 import marshmallow as ma
 from contract_sentinel import contract, Role
 
-@contract(topic="orders", role=Role.PRODUCER, version="1.0.0")
+@contract(topic="orders", role=Role.PRODUCER)
 class OrderSchema(ma.Schema):
     id = ma.fields.Integer(required=True)
 """
@@ -26,7 +26,7 @@ _PRODUCER_SRC_UPDATED = """\
 import marshmallow as ma
 from contract_sentinel import contract, Role
 
-@contract(topic="orders", role=Role.PRODUCER, version="1.0.0")
+@contract(topic="orders", role=Role.PRODUCER)
 class OrderSchema(ma.Schema):
     id = ma.fields.Integer(required=True)
     name = ma.fields.String()
@@ -36,7 +36,7 @@ class OrderSchema(ma.Schema):
 _BROKEN_SCHEMA_SRC = """\
 from contract_sentinel import contract, Role
 
-@contract(topic="orders", role=Role.PRODUCER, version="1.0.0")
+@contract(topic="orders", role=Role.PRODUCER)
 class BrokenSchema:
     pass
 """
@@ -63,11 +63,11 @@ class TestPublishContracts:
             "  Unchanged: 0\n"
             "  Failed:    0\n"
             "\n  Published schemas:\n"
-            "    ✓ orders/1.0.0/producer/test-repo_OrderSchema.json\n"
+            "    ✓ orders/producer/test-repo_OrderSchema.json\n"
             "\n"
         )
 
-        assert s3_store.file_exists("orders/1.0.0/producer/test-repo_OrderSchema.json")
+        assert s3_store.file_exists("orders/producer/test-repo_OrderSchema.json")
 
     def test_second_run_is_idempotent(
         self,
@@ -111,7 +111,7 @@ class TestPublishContracts:
             "  Unchanged: 0\n"
             "  Failed:    0\n"
             "\n  Updated schemas:\n"
-            "    ↻ orders/1.0.0/producer/test-repo_OrderSchema.json\n"
+            "    ↻ orders/producer/test-repo_OrderSchema.json\n"
             "\n"
         )
 
@@ -165,6 +165,6 @@ class TestPublishContracts:
             "  Unchanged: 1\n"
             "  Failed:    0\n"
             "\n  Unchanged schemas (skipped):\n"
-            "    - orders/1.0.0/producer/test-repo_OrderSchema.json\n"
+            "    - orders/producer/test-repo_OrderSchema.json\n"
             "\n"
         )

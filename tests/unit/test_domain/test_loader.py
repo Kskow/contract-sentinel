@@ -16,7 +16,7 @@ class TestLoadMarkedClasses:
         (tmp_path / "schemas.py").write_text(
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='orders', role=Role.PRODUCER, version='1.0.0')\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
             "class OrderSchema:\n"
             "    pass\n"
         )
@@ -30,7 +30,7 @@ class TestLoadMarkedClasses:
         (tmp_path / "schemas.py").write_text(
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='orders', role=Role.PRODUCER, version='1.0.0')\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
             "class MarkedSchema:\n"
             "    pass\n"
             "\n"
@@ -62,7 +62,7 @@ class TestLoadMarkedClasses:
         (subdir / "orders.py").write_text(
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='orders', role=Role.CONSUMER, version='2.0.0')\n"
+            "@contract(topic='orders', role=Role.CONSUMER)\n"
             "class OrderConsumerSchema:\n"
             "    pass\n"
         )
@@ -79,7 +79,7 @@ class TestLoadMarkedClasses:
         (tmp_path / "good.py").write_text(
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='payments', role=Role.PRODUCER, version='1.0.0')\n"
+            "@contract(topic='payments', role=Role.PRODUCER)\n"
             "class PaymentSchema:\n"
             "    pass\n"
         )
@@ -105,7 +105,7 @@ class TestLoadMarkedClasses:
             "from a_base import BaseSchema\n"
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='orders', role=Role.PRODUCER, version='1.0.0')\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
             "class OrderSchema(BaseSchema):\n"
             "    pass\n"
         )
@@ -125,7 +125,7 @@ class TestLoadMarkedClasses:
             "from c_address import AddressField\n"
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='orders', role=Role.PRODUCER, version='1.0.0')\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
             "class OrderSchema:\n"
             "    address = AddressField\n"
         )
@@ -150,7 +150,7 @@ class TestLoadMarkedClasses:
             "from a_address import AddressField\n"
             "from contract_sentinel.domain.participant import Role, contract\n"
             "\n"
-            "@contract(topic='orders', role=Role.PRODUCER, version='1.0.0')\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
             "class OrderSchema:\n"
             "    address = AddressField\n"
         )

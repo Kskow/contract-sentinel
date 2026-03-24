@@ -27,13 +27,11 @@ def _schema(
     *,
     topic: str = "orders",
     role: str = "producer",
-    version: str = "1.0.0",
     fields: list[ContractField] | None = None,
 ) -> ContractSchema:
     return ContractSchema(
         topic=topic,
         role=role,
-        version=version,
         repository="test-repo",
         class_name="OrderSchema",
         unknown=UnknownFieldBehaviour.FORBID,
@@ -91,10 +89,10 @@ def _config(name: str = "test-repo") -> MagicMock:
 
 class TestFailedPublishToDict:
     def test_serialises_key_and_reason(self) -> None:
-        f = FailedPublish(key="orders/1.0.0/producer/svc_Schema.json", reason="connection refused")
+        f = FailedPublish(key="orders/producer/svc_Schema.json", reason="connection refused")
 
         assert f.to_dict() == {
-            "key": "orders/1.0.0/producer/svc_Schema.json",
+            "key": "orders/producer/svc_Schema.json",
             "reason": "connection refused",
         }
 
@@ -117,14 +115,14 @@ class TestPublishReportToDict:
             published=[],
             updated=[],
             unchanged=[],
-            failed=[FailedPublish(key="orders/1.0.0/producer/svc_Schema.json", reason="timeout")],
+            failed=[FailedPublish(key="orders/producer/svc_Schema.json", reason="timeout")],
         )
 
         assert report.to_dict() == {
             "published": [],
             "updated": [],
             "unchanged": [],
-            "failed": [{"key": "orders/1.0.0/producer/svc_Schema.json", "reason": "timeout"}],
+            "failed": [{"key": "orders/producer/svc_Schema.json", "reason": "timeout"}],
         }
 
     def test_zero_counts(self) -> None:

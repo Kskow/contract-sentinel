@@ -68,8 +68,7 @@ def publish_contracts(
     Phase 1 — Parse: every class is parsed before anything is written.
     If any class fails (unsupported framework, missing extra, broken schema),
     all errors are collected and the function returns immediately without
-    touching the store.  This prevents a partial publish where some schemas
-    are at the new version while others remain stale.
+    touching the store.  This prevents a partial publish.
 
     Phase 2 — Write: only reached when all classes parsed successfully.
     Each contract is compared against its stored hash; the store is written

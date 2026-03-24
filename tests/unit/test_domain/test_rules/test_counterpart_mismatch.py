@@ -4,13 +4,10 @@ from contract_sentinel.domain.rules.counterpart_mismatch import CounterpartMisma
 from contract_sentinel.domain.schema import ContractSchema, UnknownFieldBehaviour
 
 
-def _schema(
-    topic: str = "orders", version: str = "1.0.0", role: str = "producer"
-) -> ContractSchema:
+def _schema(topic: str = "orders", role: str = "producer") -> ContractSchema:
     return ContractSchema(
         topic=topic,
         role=role,
-        version=version,
         repository="test-repo",
         class_name="OrderSchema",
         unknown=UnknownFieldBehaviour.FORBID,
@@ -26,7 +23,7 @@ class TestCounterpartMismatchRule:
         assert CounterpartMismatchRule().check(producers, consumers) == []
 
     def test_returns_warning_when_only_consumers_exist(self) -> None:
-        consumers = [_schema(role="consumer", topic="orders", version="1.1.0")]
+        consumers = [_schema(role="consumer", topic="orders")]
 
         violations = CounterpartMismatchRule().check([], consumers)
 
@@ -37,13 +34,13 @@ class TestCounterpartMismatchRule:
             "field_path": "",
             "producer": {},
             "consumer": {},
-            "message": "Topic 'orders' version '1.1.0' has 1 consumer(s) but no matching producer.",
+            "message": "Topic 'orders' has 1 consumer(s) but no matching producer.",
         }
 
     def test_returns_warning_when_only_producers_exist(self) -> None:
         producers = [
-            _schema(role="producer", topic="orders", version="1.1.0"),
-            _schema(role="producer", topic="orders", version="1.1.0"),
+            _schema(role="producer", topic="orders"),
+            _schema(role="producer", topic="orders"),
         ]
 
         violations = CounterpartMismatchRule().check(producers, [])
@@ -55,7 +52,7 @@ class TestCounterpartMismatchRule:
             "field_path": "",
             "producer": {},
             "consumer": {},
-            "message": "Topic 'orders' version '1.1.0' has 2 producer(s) but no matching consumer.",
+            "message": "Topic 'orders' has 2 producer(s) but no matching consumer.",
         }
 
     def test_returns_empty_when_both_lists_are_empty(self) -> None:

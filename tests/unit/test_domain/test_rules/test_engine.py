@@ -28,7 +28,6 @@ def _schema(
     return ContractSchema(
         topic="orders",
         role=role,
-        version="1.0.0",
         repository=repository,
         class_name="OrderSchema",
         unknown=unknown,
@@ -134,9 +133,7 @@ class TestValidateContract:
                     "field_path": "",
                     "producer": {},
                     "consumer": {},
-                    "message": (
-                        "Topic 'orders' version '1.0.0' has 1 producer(s) but no matching consumer."
-                    ),
+                    "message": ("Topic 'orders' has 1 producer(s) but no matching consumer."),
                 }
             ],
         }
@@ -158,9 +155,7 @@ class TestValidateContract:
                     "field_path": "",
                     "producer": {},
                     "consumer": {},
-                    "message": (
-                        "Topic 'orders' version '1.0.0' has 1 consumer(s) but no matching producer."
-                    ),
+                    "message": ("Topic 'orders' has 1 consumer(s) but no matching producer."),
                 }
             ],
         }

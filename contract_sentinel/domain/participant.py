@@ -19,27 +19,25 @@ class ContractMeta:
 
     topic: str
     role: Role
-    version: str
 
 
 def contract(
     topic: str,
     role: Role,
-    version: str,
 ) -> Callable[[type[_T]], type[_T]]:
     """Class decorator that marks a schema as a contract participant.
 
     Sets ``__contract__`` on the decorated class to a :class:`ContractMeta`
-    instance carrying the supplied *topic*, *role*, and *version*.  No other attribute on the
+    instance carrying the supplied *topic* and *role*.  No other attribute on the
     class is modified.
 
     Usage::
 
-        @contract(topic="orders.created", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="orders.created", role=Role.PRODUCER)
         class OrderSchema(Schema):
             ...
     """
-    meta = ContractMeta(topic=topic, role=role, version=version)
+    meta = ContractMeta(topic=topic, role=role)
 
     def decorator(cls: type[_T]) -> type[_T]:
         cls.__contract__ = meta  # type: ignore[attr-defined]

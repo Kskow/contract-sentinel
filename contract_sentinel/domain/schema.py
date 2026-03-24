@@ -94,7 +94,7 @@ class ContractField:
 
 @dataclasses.dataclass
 class ContractSchema:
-    """Canonical envelope for a versioned contract published by one participant.
+    """Canonical envelope for a contract published by one participant.
 
     Produced by the parser adapter from a decorated schema class and stored in
     Storage as JSON. Consumed by the validator to compare producer/consumer pairs.
@@ -102,7 +102,6 @@ class ContractSchema:
 
     topic: str
     role: str
-    version: str
     repository: str
     class_name: str
     unknown: UnknownFieldBehaviour
@@ -112,7 +111,6 @@ class ContractSchema:
         return {
             "topic": self.topic,
             "role": self.role,
-            "version": self.version,
             "repository": self.repository,
             "class_name": self.class_name,
             "unknown": self.unknown.value,
@@ -121,14 +119,13 @@ class ContractSchema:
 
     def to_store_key(self) -> str:
         """Return the canonical relative S3 key for this contract."""
-        return f"{self.topic}/{self.version}/{self.role}/{self.repository}_{self.class_name}.json"
+        return f"{self.topic}/{self.role}/{self.repository}_{self.class_name}.json"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ContractSchema:
         return cls(
             topic=data["topic"],
             role=data["role"],
-            version=data["version"],
             repository=data["repository"],
             class_name=data["class_name"],
             unknown=UnknownFieldBehaviour(data["unknown"]),

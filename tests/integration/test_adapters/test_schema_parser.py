@@ -30,7 +30,7 @@ class TestMarshmallow3Parser:
         ],
     )
     def test_unknown_policy_maps_to_expected_value(self, ma_unknown: str, expected: str) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             class Meta:
                 unknown = ma_unknown
@@ -46,7 +46,7 @@ class TestMarshmallow3Parser:
             class Meta:
                 unknown = ma.EXCLUDE
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class ChildSchema(BaseSchema):
             name = ma.fields.String()
 
@@ -56,7 +56,7 @@ class TestMarshmallow3Parser:
 
     @pytest.mark.parametrize(("required", "expected"), [(True, True), (False, False)])
     def test_required_flag(self, required: bool, expected: bool) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             name = ma.fields.String(required=required)
 
@@ -66,7 +66,7 @@ class TestMarshmallow3Parser:
 
     @pytest.mark.parametrize(("allow_none", "expected"), [(True, True), (False, False)])
     def test_nullable_flag(self, allow_none: bool, expected: bool) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             name = ma.fields.String(allow_none=allow_none)
 
@@ -75,7 +75,7 @@ class TestMarshmallow3Parser:
         assert field["is_nullable"] is expected
 
     def test_load_only_field_includes_is_load_only_in_output(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             password = ma.fields.String(load_only=True)
 
@@ -92,7 +92,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_dump_only_field_includes_is_dump_only_in_output(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             created_at = ma.fields.String(dump_only=True)
 
@@ -109,7 +109,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_data_key_is_used_as_wire_name(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             order_id = ma.fields.String(data_key="orderId")
 
@@ -123,7 +123,7 @@ class TestMarshmallow3Parser:
     # -------------------------------------------------------------------------
 
     def test_load_default_appears_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             is_active = ma.fields.String(load_default="test_value")
 
@@ -133,7 +133,7 @@ class TestMarshmallow3Parser:
         assert field["metadata"]["load_default"] == "test_value"
 
     def test_dump_default_appears_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             status = ma.fields.String(dump_default="test_value")
 
@@ -147,7 +147,7 @@ class TestMarshmallow3Parser:
     # -------------------------------------------------------------------------
 
     def test_simple_fields_without_format(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class SimpleSchema(ma.Schema):
             f_integer = ma.fields.Integer()
             f_float = ma.fields.Float()
@@ -160,7 +160,6 @@ class TestMarshmallow3Parser:
         assert Marshmallow3Parser(repository="svc").parse(SimpleSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "SimpleSchema",
             "unknown": "forbid",
@@ -218,7 +217,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_simple_fields_with_format(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class FormattedSchema(ma.Schema):
             f_naive_datetime = ma.fields.NaiveDateTime()
             f_aware_datetime = ma.fields.AwareDateTime()
@@ -241,7 +240,6 @@ class TestMarshmallow3Parser:
         assert Marshmallow3Parser(repository="svc").parse(FormattedSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "FormattedSchema",
             "unknown": "forbid",
@@ -313,14 +311,13 @@ class TestMarshmallow3Parser:
         class _Unrecognised(ma.fields.Field):
             pass
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             mystery = _Unrecognised()
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -337,7 +334,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_constant_field_type_reflects_python_value_type(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             str_const = ma.fields.Constant("active")
             int_const = ma.fields.Constant(42)
@@ -348,7 +345,6 @@ class TestMarshmallow3Parser:
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -365,14 +361,13 @@ class TestMarshmallow3Parser:
             street = ma.fields.String(required=True)
             city = ma.fields.String(required=True)
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class PersonSchema(ma.Schema):
             address = ma.fields.Nested(AddressSchema, required=True)
 
         assert Marshmallow3Parser(repository="svc").parse(PersonSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "PersonSchema",
             "unknown": "forbid",
@@ -408,14 +403,13 @@ class TestMarshmallow3Parser:
         class TagSchema(ma.Schema):
             label = ma.fields.String(required=True)
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class EventSchema(ma.Schema):
             tags = ma.fields.Nested(TagSchema, many=True)
 
         assert Marshmallow3Parser(repository="svc").parse(EventSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "EventSchema",
             "unknown": "forbid",
@@ -447,14 +441,13 @@ class TestMarshmallow3Parser:
 
             label = ma.fields.String()
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class EventSchema(ma.Schema):
             tags = ma.fields.Nested(TagsSchema)
 
         assert Marshmallow3Parser(repository="svc").parse(EventSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "EventSchema",
             "unknown": "forbid",
@@ -485,14 +478,13 @@ class TestMarshmallow3Parser:
             city = ma.fields.String()
             postcode = ma.fields.String()
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class PersonSchema(ma.Schema):
             address = ma.fields.Nested(AddressSchema, only=["city"])
 
         assert Marshmallow3Parser(repository="svc").parse(PersonSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "PersonSchema",
             "unknown": "forbid",
@@ -518,14 +510,13 @@ class TestMarshmallow3Parser:
         }
 
     def test_list_of_primitive_produces_array_with_item_type(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             tags = ma.fields.List(ma.fields.String())
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -545,14 +536,13 @@ class TestMarshmallow3Parser:
         class TagSchema(ma.Schema):
             label = ma.fields.String()
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             tags = ma.fields.List(ma.fields.Nested(TagSchema))
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -578,14 +568,13 @@ class TestMarshmallow3Parser:
         }
 
     def test_dict_with_primitive_values_captures_key_and_value_types(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             scores = ma.fields.Dict(keys=ma.fields.String(), values=ma.fields.Integer())
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -605,14 +594,13 @@ class TestMarshmallow3Parser:
         class ItemSchema(ma.Schema):
             count = ma.fields.Integer()
 
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             inventory = ma.fields.Dict(keys=ma.fields.String(), values=ma.fields.Nested(ItemSchema))
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -639,14 +627,13 @@ class TestMarshmallow3Parser:
         }
 
     def test_tuple_field_marks_is_supported_false(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             coords = ma.fields.Tuple(tuple_fields=(ma.fields.Float(), ma.fields.Float()))
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -662,7 +649,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_method_field_marks_is_supported_false(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             full_name = ma.fields.Method("get_full_name")
 
@@ -672,7 +659,6 @@ class TestMarshmallow3Parser:
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -689,14 +675,13 @@ class TestMarshmallow3Parser:
         }
 
     def test_function_field_marks_is_supported_false(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             label = ma.fields.Function(lambda obj: str(obj))
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -713,14 +698,13 @@ class TestMarshmallow3Parser:
         }
 
     def test_enum_field_produces_string_type_with_format_and_values(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             color = ma.fields.Enum(_Color)
 
         assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "svc",
             "class_name": "MySchema",
             "unknown": "forbid",
@@ -741,7 +725,7 @@ class TestMarshmallow3Parser:
     # -------------------------------------------------------------------------
 
     def test_length_validator_with_min_and_max_appears_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             username = ma.fields.String(validate=mv.Length(min=1, max=10))
 
@@ -757,7 +741,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_length_validator_with_equal_appears_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             pin = ma.fields.String(validate=mv.Length(equal=5))
 
@@ -773,7 +757,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_range_validator_appears_in_metadata_with_inclusivity_flags(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             score = ma.fields.Integer(validate=mv.Range(min=0, max=100))
 
@@ -791,7 +775,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_regexp_validator_appears_as_pattern_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             code = ma.fields.String(validate=mv.Regexp(r"^\d+$"))
 
@@ -807,7 +791,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_one_of_validator_appears_as_allowed_values_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             status = ma.fields.String(validate=mv.OneOf(["active", "inactive"]))
 
@@ -823,7 +807,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_and_validator_extracts_all_inner_constraints(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             code = ma.fields.String(validate=mv.And(mv.Length(min=1), mv.Regexp(r"^\d+$")))
 
@@ -839,7 +823,7 @@ class TestMarshmallow3Parser:
         }
 
     def test_datetime_with_iso_format_produces_custom_format_in_metadata(self) -> None:
-        @contract(topic="t", role=Role.PRODUCER, version="1.0.0")
+        @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
             created_at = ma.fields.DateTime(format="iso")
 

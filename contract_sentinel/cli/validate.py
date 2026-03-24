@@ -89,7 +89,7 @@ def print_report(report: ContractsValidationReport, *, verbose: bool = False) ->
             continue
 
         icon = "✓" if contract_report.status == ValidationStatus.PASSED else "✗"
-        contract_line = f"  {icon}  {contract_report.topic}/{contract_report.version}"
+        contract_line = f"  {icon}  {contract_report.topic}"
         if contract_report.status == ValidationStatus.FAILED:
             contract_line = typer.style(contract_line, fg=typer.colors.RED)
 

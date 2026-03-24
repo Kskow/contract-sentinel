@@ -32,17 +32,15 @@ class ValidationStatus(StrEnum):
 
 @dataclasses.dataclass
 class ContractReport:
-    """Validation result for a single (topic, version) group, broken down by pair."""
+    """Validation result for a single topic group, broken down by pair."""
 
     topic: str
-    version: str
     status: ValidationStatus
     pairs: list[PairViolations]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "topic": self.topic,
-            "version": self.version,
             "status": self.status,
             "pairs": [p.to_dict() for p in self.pairs],
         }
@@ -50,7 +48,7 @@ class ContractReport:
 
 @dataclasses.dataclass
 class ContractsValidationReport:
-    """Aggregated result across all validated (topic, version) pairs."""
+    """Aggregated result across all validated topic pairs."""
 
     status: ValidationStatus
     reports: list[ContractReport]
@@ -87,20 +85,19 @@ def validate_local_contracts(
 
 
 def _validate_local_contract(store: ContractStore, local_schema: ContractSchema) -> ContractReport:
-    """Validate one local schema against its version-matched counterparts from the store."""
+    """Validate one local schema against its counterparts from the store."""
     role = Role(local_schema.role)
     opposite_role = Role.CONSUMER if role == Role.PRODUCER else Role.PRODUCER
 
     counterparts: list[ContractSchema] = []
     for key in store.list_files(f"{local_schema.topic}/"):
-        if f"/{local_schema.version}/" in key and f"/{opposite_role.value}/" in key:
+        if f"/{opposite_role.value}/" in key:
             counterparts.append(ContractSchema.from_dict(json.loads(store.get_file(key))))
 
     pairs = validate_contract([local_schema, *counterparts])
 
     return ContractReport(
         topic=local_schema.topic,
-        version=local_schema.version,
         status=_derive_status(pairs),
         pairs=pairs,
     )
@@ -112,34 +109,32 @@ def validate_published_contracts(
 ) -> ContractsValidationReport:
     """Validate all contracts already published to the store against each other."""
     topic_filter: set[str] = set(topics) if topics is not None else set()
-    by_topic_version: dict[tuple[str, str], list[ContractSchema]] = defaultdict(list)
+    by_topic: dict[str, list[ContractSchema]] = defaultdict(list)
     for key in store.list_files(""):
         if topic_filter and key.split("/")[0] not in topic_filter:
             continue
         schema = ContractSchema.from_dict(json.loads(store.get_file(key)))
-        by_topic_version[(schema.topic, schema.version)].append(schema)
+        by_topic[schema.topic].append(schema)
 
-    for missing in topic_filter - {topic for topic, _ in by_topic_version}:
+    for missing in topic_filter - set(by_topic):
         logger.warning("Topic '%s' was requested but no published contract was found.", missing)
 
     contract_reports: list[ContractReport] = []
-    for (topic, version), schemas in by_topic_version.items():
-        contract_reports.append(_validate_published_contract(topic, version, schemas))
+    for topic, schemas in by_topic.items():
+        contract_reports.append(_validate_published_contract(topic, schemas))
 
     return _build_report(contract_reports)
 
 
 def _validate_published_contract(
     topic: str,
-    version: str,
     schemas: list[ContractSchema],
 ) -> ContractReport:
-    """Validate all published schemas for one (topic, version) pair against each other."""
+    """Validate all published schemas for one topic against each other."""
     pairs = validate_contract(schemas)
 
     return ContractReport(
         topic=topic,
-        version=version,
         status=_derive_status(pairs),
         pairs=pairs,
     )

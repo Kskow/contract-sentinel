@@ -91,7 +91,6 @@ class TestContractSchema:
         schema = ContractSchema(
             topic="orders.created",
             role="producer",
-            version="1.0.0",
             repository="my-service",
             class_name="OrderSchema",
             unknown=UnknownFieldBehaviour.FORBID,
@@ -120,7 +119,6 @@ class TestContractSchema:
         schema = ContractSchema(
             topic="users.registered",
             role="consumer",
-            version="2.1.0",
             repository="user-service",
             class_name="UserSchema",
             unknown=UnknownFieldBehaviour.IGNORE,
@@ -133,7 +131,6 @@ class TestContractSchema:
         schema = ContractSchema(
             topic="orders.created",
             role="producer",
-            version="1.0.0",
             repository="my-service",
             class_name="OrderSchema",
             unknown=UnknownFieldBehaviour.FORBID,
@@ -146,7 +143,6 @@ class TestContractSchema:
         data = {
             "topic": "orders.created",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "my-service",
             "class_name": "OrderSchema",
             "unknown": "allow",
@@ -159,35 +155,32 @@ class TestContractSchema:
         schema = ContractSchema(
             topic="orders.created",
             role="producer",
-            version="1.0.0",
             repository="order-service",
             class_name="OrderSchema",
             unknown=UnknownFieldBehaviour.FORBID,
             fields=[],
         )
 
-        expected = "orders.created/1.0.0/producer/order-service_OrderSchema.json"
+        expected = "orders.created/producer/order-service_OrderSchema.json"
         assert schema.to_store_key() == expected
 
     def test_to_store_key_returns_consumer_path(self) -> None:
         schema = ContractSchema(
             topic="orders.created",
             role="consumer",
-            version="2.1.0",
             repository="billing-service",
             class_name="InvoiceSchema",
             unknown=UnknownFieldBehaviour.IGNORE,
             fields=[],
         )
 
-        expected = "orders.created/2.1.0/consumer/billing-service_InvoiceSchema.json"
+        expected = "orders.created/consumer/billing-service_InvoiceSchema.json"
         assert schema.to_store_key() == expected
 
     def test_to_dict_serialises_all_root_fields_correctly(self) -> None:
         schema = ContractSchema(
             topic="orders.created",
             role="producer",
-            version="1.0.0",
             repository="my-service",
             class_name="OrderSchema",
             unknown=UnknownFieldBehaviour.FORBID,
@@ -197,7 +190,6 @@ class TestContractSchema:
         assert schema.to_dict() == {
             "topic": "orders.created",
             "role": "producer",
-            "version": "1.0.0",
             "repository": "my-service",
             "class_name": "OrderSchema",
             "unknown": "forbid",

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class CounterpartMismatchRule:
-    """Rule that checks if a topic/version group has both producers and consumers."""
+    """Rule that checks if a topic group has both producers and consumers."""
 
     def check(
         self,
@@ -28,7 +28,7 @@ class CounterpartMismatchRule:
                     producer={},
                     consumer={},
                     message=(
-                        f"Topic '{first.topic}' version '{first.version}' has "
+                        f"Topic '{first.topic}' has "
                         f"{len(consumers)} consumer(s) but no matching producer."
                     ),
                 )
@@ -45,7 +45,7 @@ class CounterpartMismatchRule:
                     producer={},
                     consumer={},
                     message=(
-                        f"Topic '{first.topic}' version '{first.version}' has "
+                        f"Topic '{first.topic}' has "
                         f"{len(producers)} producer(s) but no matching consumer."
                     ),
                 )

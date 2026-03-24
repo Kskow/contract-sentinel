@@ -61,7 +61,6 @@ Class-level decorator. Adds `__contract__` to the decorated schema class.
 Arguments:
 * `topic: str` — e.g. `"orders.created"`
 * `role: Role` — `Role.PRODUCER` or `Role.CONSUMER`
-* `version: str` — e.g. `"1.0.0"`
 
 **Constraint:** Arguments must be string/enum literals, not variables.
 
@@ -119,7 +118,6 @@ MVP adapter: `Marshmallow3Parser`. Interface is framework-agnostic.
 {
   "topic": "orders.created",
   "role": "producer",
-  "version": "1.1.0",
   "repository": "order-service",
   "class_name": "OrderSchema",
   "unknown": "forbid",
@@ -167,7 +165,7 @@ MVP adapter: `S3ContractStore`.
 ### S3 Path Convention
 
 ```
-<bucket>/<path>/<topic_name>/<version>/<role>/<repository_name>_<class_name>.json
+<bucket>/<path>/<topic_name>/<role>/<repository_name>_<class_name>.json
 ```
 
 `<path>` is the `SENTINEL_S3_PATH` env var, defaulting to `"contract_tests"`.
@@ -175,18 +173,16 @@ MVP adapter: `S3ContractStore`.
 
 Example:
 ```
-my-bucket/contract_tests/orders.created/1.1.0/producer/order-service_OrderSchema.json
-my-bucket/contract_tests/orders.created/1.0.0/consumer/billing-service_InvoiceSchema.json
+my-bucket/contract_tests/orders.created/producer/order-service_OrderSchema.json
+my-bucket/contract_tests/orders.created/consumer/billing-service_InvoiceSchema.json
 ```
 
 `ContractSchema.to_store_key()` is the single source of truth for constructing the
 relative key. The publish service calls it when writing; the validate service uses the
 role directory segment to filter listed keys to the correct side of the contract.
 
-### Version Resolution
-
-Latest contract resolved by **S3 `LastModified` timestamp**. Version string in path is a
-human-readable label only.
+Latest contract state resolved by **S3 `LastModified` timestamp** — `list_files` returns
+keys ordered newest-first, so callers can take the first result without any path parsing.
 
 ### Repository Name Precedence
 
@@ -315,7 +311,8 @@ Calls `validate_local_contracts(store, parser, loader, config)`.
 
 1. Load config.
 2. Scan and parse local schemas.
-3. For each local schema, fetch all counterpart schemas (opposite role, same topic) from S3.
+3. For each local schema, fetch all counterpart schemas (opposite role, same topic) from S3,
+   filtered by `/{role}/` in the S3 key.
 4. Validate the local schema against every remote counterpart; collect all violations.
 5. Print violation report.
 6. Exit `1` on any violations, exit `0` on pass.
