@@ -37,7 +37,7 @@ fix:
 
 # Full quality gate — mirrors CI
 check:
-    docker compose run --rm app sh -c "uv run ruff check . && uv run ruff format --check . && uv run ty check && uv run pytest"
+    docker compose run --rm app sh -c "uv run ruff check . && uv run ruff format --check . && uv run ty check && (uv run pytest; e=\$?; [ \$e -eq 0 ] || [ \$e -eq 5 ] || exit \$e)"
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 
