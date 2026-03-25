@@ -39,7 +39,7 @@ def publish_contracts(
         sys.path.insert(0, cwd_str)
 
     def loader() -> list[type]:
-        return load_marked_classes(scan_path)
+        return load_marked_classes(scan_path, exclude=config.exclude)
 
     report = service_publish_contracts(store, get_parser, loader, config)
 

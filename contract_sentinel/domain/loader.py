@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import inspect
 import logging
+import re
 import sys
 from typing import TYPE_CHECKING
 
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def load_marked_classes(path: Path) -> list[type]:
+def load_marked_classes(path: Path, exclude: list[str] | None = None) -> list[type]:
     """Walk *path* recursively and return all classes decorated with ``@contract``.
 
     Files are imported using a retry loop: each pass attempts all previously
@@ -23,9 +24,11 @@ def load_marked_classes(path: Path) -> list[type]:
     successes — remaining failures are genuinely unresolvable (syntax errors,
     missing packages) and are logged as warnings.
 
-    Non-``.py`` files are silently ignored.
+    Non-``.py`` files and files matching any *exclude* pattern are silently
+    ignored. Raises ``re.error`` immediately on an invalid pattern before any
+    file is scanned.
     """
-    pending = sorted(path.rglob("*.py"))
+    pending = _collect_py_files(path, exclude or [])
     successful_modules: list[ModuleType] = []
 
     while pending:
@@ -53,6 +56,22 @@ def load_marked_classes(path: Path) -> list[type]:
                 marked.append(obj)
 
     return marked
+
+
+def _collect_py_files(root: Path, exclude: list[str]) -> list[Path]:
+    """Return all ``.py`` files under *root*, sorted, with excluded directories pruned."""
+    exclude_regex = re.compile("|".join(exclude)) if exclude else None
+    result = []
+
+    for dirpath, dirs, files in root.walk(top_down=True):
+        if exclude_regex:
+            dirs[:] = [
+                d for d in dirs if not exclude_regex.search(f"{(dirpath / d).relative_to(root)}/")
+            ]
+
+        result.extend(dirpath / f for f in files if f.endswith(".py"))
+
+    return sorted(result)
 
 
 def _try_import(file: Path, root: Path) -> ModuleType | None:

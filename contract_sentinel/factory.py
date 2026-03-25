@@ -37,7 +37,7 @@ def get_parser(framework: Framework, repository: str) -> SchemaParser:
 
 def get_store(config: Config) -> ContractStore:
     """Instantiate the contract store adapter for the configured storage backend."""
-    match config.storage_backend:
+    match config.store:
         case "s3":
             from contract_sentinel.adapters.contract_store import S3ContractStore
 
@@ -52,10 +52,10 @@ def get_store(config: Config) -> ContractStore:
                 )
             except ImportError as exc:
                 raise MissingDependencyError(
-                    "storage backend 's3' requires the s3 extra.\n"
+                    "store 's3' requires the s3 extra.\n"
                     "Install it with: pip install contract-sentinel[s3]"
                 ) from exc
         case _:
             raise UnsupportedStorageError(
-                f"Unrecognised storage backend '{config.storage_backend}'. Valid options: 's3'."
+                f"Unrecognised store '{config.store}'. Valid options: 's3'."
             )

@@ -47,7 +47,7 @@ def validate_local_contracts(
         sys.path.insert(0, cwd_str)
 
     def loader() -> list[type]:
-        return load_marked_classes(scan_path)
+        return load_marked_classes(scan_path, exclude=config.exclude)
 
     report = service_validate_local_contracts(store, get_parser, loader, config)
 

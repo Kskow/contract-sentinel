@@ -84,16 +84,16 @@ class TestGetStore:
         assert store._path == "sentinel/v1"
 
     def test_raises_unsupported_storage_error_with_descriptive_message(self) -> None:
-        with patch.dict(os.environ, {"SENTINEL_STORAGE_BACKEND": "gcs"}):
+        with patch.dict(os.environ, {"SENTINEL_STORE": "gcs"}):
             config = Config()
 
         with pytest.raises(UnsupportedStorageError) as exc_info:
             get_store(config)
 
-        assert str(exc_info.value) == ("Unrecognised storage backend 'gcs'. Valid options: 's3'.")
+        assert str(exc_info.value) == ("Unrecognised store 'gcs'. Valid options: 's3'.")
 
-    def test_storage_backend_is_case_insensitive(self) -> None:
-        with patch.dict(os.environ, {"SENTINEL_STORAGE_BACKEND": "S3"}):
+    def test_store_is_case_insensitive(self) -> None:
+        with patch.dict(os.environ, {"SENTINEL_STORE": "S3"}):
             config = Config()
 
         store = get_store(config)
@@ -110,6 +110,5 @@ class TestGetStore:
             get_store(config)
 
         assert str(exc_info.value) == (
-            "storage backend 's3' requires the s3 extra.\n"
-            "Install it with: pip install contract-sentinel[s3]"
+            "store 's3' requires the s3 extra.\nInstall it with: pip install contract-sentinel[s3]"
         )

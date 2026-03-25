@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import pytest
 
-if TYPE_CHECKING:
-    from contract_sentinel.adapters.contract_store import S3ContractStore
+from contract_sentinel.adapters.contract_store import S3ContractStore
 
 
 class TestS3ContractStore:
@@ -48,3 +47,40 @@ class TestS3ContractStore:
         s3_store.put_file("orders/producer.json", '{"version": "2"}')
 
         assert s3_store.get_file("orders/producer.json") == '{"version": "2"}'
+
+    def test_delete_file_removes_the_object(self, s3_store: S3ContractStore) -> None:
+        s3_store.put_file("orders/producer.json", "{}")
+
+        s3_store.delete_file("orders/producer.json")
+
+        assert s3_store.file_exists("orders/producer.json") is False
+
+    def test_raises_when_bucket_is_missing(self) -> None:
+        with pytest.raises(ValueError, match="requires 'bucket'"):
+            S3ContractStore(
+                bucket=None,
+                path="contract_tests",
+                region="us-east-1",
+                aws_access_key_id="test",
+                aws_secret_access_key="test",
+            )
+
+    def test_raises_when_aws_access_key_id_is_missing(self) -> None:
+        with pytest.raises(ValueError, match="requires 'aws_access_key_id'"):
+            S3ContractStore(
+                bucket="test-bucket",
+                path="contract_tests",
+                region="us-east-1",
+                aws_access_key_id=None,
+                aws_secret_access_key="test",
+            )
+
+    def test_raises_when_aws_secret_access_key_is_missing(self) -> None:
+        with pytest.raises(ValueError, match="requires 'aws_secret_access_key'"):
+            S3ContractStore(
+                bucket="test-bucket",
+                path="contract_tests",
+                region="us-east-1",
+                aws_access_key_id="test",
+                aws_secret_access_key=None,
+            )

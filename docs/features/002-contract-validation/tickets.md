@@ -738,6 +738,8 @@ is omitted and the line renders exactly as before — no breaking change to exis
 **Depends on:** TICKET-06, TICKET-12
 **Type:** Enhancement
 
+**Status: ✅ Done**
+
 **Goal:**
 Extend `load_marked_classes` and `Config` to support exclusion patterns so that common noise
 directories (virtual environments, package trees, caches, JS dependencies) are always skipped, and
@@ -795,25 +797,19 @@ Matching is checked before `_try_import` is called — excluded files are never 
 filtered from results.
 
 **Done when:**
-- [ ] `BUILT_IN_EXCLUDE_PATTERNS` is a `frozenset[str]` constant defined at the top of
-      `loader.py`; it covers `.venv/`, `venv/`, `__pycache__/`, `site-packages/`,
-      `node_modules/`, `.git/`, `.tox/`, and `.egg-info/`
-- [ ] `load_marked_classes(path, exclude)` accepts `path: str | Path` (default `"."`) and
-      `exclude: list[str] | None` (default `None`); resolves exclude internally with
-      `exclude = exclude or []`; the effective pattern set is always
-      `BUILT_IN_EXCLUDE_PATTERNS | set(exclude)` — there is no way for callers to remove
-      built-in patterns
-- [ ] Matching uses `re.search()` against the relative path with separators normalised to `/`;
-      excluded files are never passed to `_try_import`
-- [ ] An invalid regex in `exclude` raises `re.error` before any file is scanned, with the
-      offending pattern included in the error message
-- [ ] `config.exclude` defaults to `None`; `load_marked_classes` resolves it with
-      `exclude = exclude or []` — avoids a mutable default argument and signals clearly that
-      the built-ins alone are sufficient for the common case
-- [ ] Both CLI commands pass `config.exclude` through to `load_marked_classes`
-- [ ] Unit tests assert that a file under each built-in pattern directory is never imported
-- [ ] Unit tests assert that a user-supplied pattern in `exclude` is applied on top of the
-      built-ins without removing any of them
-- [ ] Unit tests assert that a file outside all patterns is still discovered normally
-- [ ] Unit test asserts that passing an invalid regex string raises `re.error`
-- [ ] `just check` passes
+- [x] `DEFAULT_EXCLUDE_PATTERNS` is a `list[str]` constant defined at the top of `config.py`;
+      it covers `.venv/`, `venv/`, `__pycache__/`, `site-packages/`, `node_modules/`, `.git/`,
+      `.tox/`, and `.egg-info/`
+- [x] `load_marked_classes(path, exclude)` accepts `exclude: list[str] | None` (default `None`);
+      resolves exclude internally with `exclude or []`
+- [x] `config.exclude` merges `DEFAULT_EXCLUDE_PATTERNS` with any user-supplied patterns from
+      `[tool.sentinel].exclude` in `pyproject.toml`; built-ins can never be removed
+- [x] Matching uses `re.search()` against the relative path; excluded directories are pruned
+      before any file under them is passed to `_try_import`
+- [x] An invalid regex in `exclude` raises `re.error` before any file is scanned
+- [x] Both CLI commands pass `config.exclude` through to `load_marked_classes`
+- [x] Unit tests assert that files under each built-in pattern directory are never imported
+- [x] Unit tests assert that a user-supplied pattern is applied on top of the built-ins
+- [x] Unit tests assert that a file outside all patterns is still discovered normally
+- [x] Unit test asserts that passing an invalid regex string raises `re.error`
+- [x] `just check` passes

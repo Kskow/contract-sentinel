@@ -49,7 +49,7 @@ def cli_env(s3_bucket: str) -> dict[str, str]:
         "AWS_ENDPOINT_URL": "http://localstack:4566",
         "SENTINEL_NAME": "test-repo",
         "SENTINEL_S3_PATH": "contract_tests",
-        "S3_BUCKET": s3_bucket,
+        "SENTINEL_S3_BUCKET": s3_bucket,
     }
 
 

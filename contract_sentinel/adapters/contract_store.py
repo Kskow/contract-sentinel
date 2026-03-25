@@ -52,15 +52,28 @@ class S3ContractStore(ContractStore):
 
     def __init__(
         self,
-        bucket: str,
+        bucket: str | None,
         path: str,
         region: str,
-        aws_access_key_id: str,
-        aws_secret_access_key: str,
+        aws_access_key_id: str | None,
+        aws_secret_access_key: str | None,
         endpoint_url: str | None = None,
     ) -> None:
         import boto3
         from botocore.exceptions import ClientError
+
+        if not bucket:
+            raise ValueError(
+                "S3ContractStore requires 'bucket' — set S3_BUCKET or [tool.sentinel].s3_bucket."
+            )
+        if not aws_access_key_id:
+            raise ValueError(
+                "S3ContractStore requires 'aws_access_key_id' — set AWS_ACCESS_KEY_ID."
+            )
+        if not aws_secret_access_key:
+            raise ValueError(
+                "S3ContractStore requires 'aws_secret_access_key' — set AWS_SECRET_ACCESS_KEY."
+            )
 
         self._bucket = bucket
         self._path = path

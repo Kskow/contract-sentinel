@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING
+
+import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 from contract_sentinel.domain.loader import load_marked_classes
 
@@ -159,3 +160,47 @@ class TestLoadMarkedClasses:
 
         assert len(result) == 1
         assert result[0].__name__ == "OrderSchema"
+
+    def test_files_matching_exclude_pattern_are_skipped(self, tmp_path: Path) -> None:
+        venv_dir = tmp_path / ".venv" / "lib"
+        venv_dir.mkdir(parents=True)
+        (venv_dir / "schemas.py").write_text(
+            "from contract_sentinel.domain.participant import Role, contract\n"
+            "\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
+            "class VenvSchema:\n"
+            "    pass\n"
+        )
+
+        result = load_marked_classes(tmp_path, exclude=[r"(^|/)\.venv/"])
+
+        assert result == []
+
+    def test_exclude_skips_only_matching_directories_and_collects_the_rest(
+        self, tmp_path: Path
+    ) -> None:
+        venv_dir = tmp_path / ".venv" / "lib"
+        venv_dir.mkdir(parents=True)
+        (venv_dir / "excluded.py").write_text(
+            "from contract_sentinel.domain.participant import Role, contract\n"
+            "\n"
+            "@contract(topic='orders', role=Role.PRODUCER)\n"
+            "class ExcludedSchema:\n"
+            "    pass\n"
+        )
+        (tmp_path / "included.py").write_text(
+            "from contract_sentinel.domain.participant import Role, contract\n"
+            "\n"
+            "@contract(topic='payments', role=Role.PRODUCER)\n"
+            "class IncludedSchema:\n"
+            "    pass\n"
+        )
+
+        result = load_marked_classes(tmp_path, exclude=[r"(^|/)\.venv/"])
+
+        assert len(result) == 1
+        assert result[0].__name__ == "IncludedSchema"
+
+    def test_invalid_exclude_pattern_raises_re_error_before_scanning(self, tmp_path: Path) -> None:
+        with pytest.raises(re.error):
+            load_marked_classes(tmp_path, exclude=["[invalid"])
