@@ -1,4 +1,4 @@
-from contract_sentinel.domain.rules.undeclared_field import UndeclaredFieldRule
+from contract_sentinel.domain.rules import UndeclaredFieldRule
 from contract_sentinel.domain.schema import UnknownFieldBehaviour
 from tests.unit.test_domain.test_rules.helpers import field
 

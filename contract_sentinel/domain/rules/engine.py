@@ -10,7 +10,6 @@ from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRul
 from contract_sentinel.domain.rules.missing_field import MissingFieldRule
 from contract_sentinel.domain.rules.nullability_mismatch import NullabilityMismatchRule
 from contract_sentinel.domain.rules.requirement_mismatch import RequirementMismatchRule
-from contract_sentinel.domain.rules.structure_mismatch import StructureMismatchRule
 from contract_sentinel.domain.rules.type_mismatch import TypeMismatchRule
 from contract_sentinel.domain.rules.undeclared_field import UndeclaredFieldRule
 
@@ -24,7 +23,6 @@ if TYPE_CHECKING:
 
 PAIR_RULES: list[Rule] = [
     TypeMismatchRule(),
-    StructureMismatchRule(),
     RequirementMismatchRule(),
     NullabilityMismatchRule(),
     MissingFieldRule(),
