@@ -1,4 +1,4 @@
-from contract_sentinel.domain.rules import NullabilityMismatchRule
+from contract_sentinel.domain.rules.nullability_mismatch import NullabilityMismatchRule
 from tests.unit.test_domain.test_rules.helpers import field
 
 

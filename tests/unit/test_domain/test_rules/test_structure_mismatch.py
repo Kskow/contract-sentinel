@@ -1,4 +1,4 @@
-from contract_sentinel.domain.rules import StructureMismatchRule
+from contract_sentinel.domain.rules.structure_mismatch import StructureMismatchRule
 from tests.unit.test_domain.test_rules.helpers import field
 
 
