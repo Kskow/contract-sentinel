@@ -3,8 +3,10 @@
 ## Architecture Overview
 
 ```
-Domain Layer:   fix_suggestions.py — pure transformation: PairViolations → PairFixSuggestion
-CLI Layer:      cli/validate.py — renders PairFixSuggestion with context-aware labels;
+Domain Layer:   fix_suggestions.py — pure transformation: ContractsValidationReport → ContractsFixReport
+                                     3-level hierarchy mirroring the validation report:
+                                     ContractsFixReport → ContractFixReport → PairFixSuggestion
+CLI Layer:      cli/validate.py — renders ContractsFixReport with context-aware labels;
                                   honours --how-to-fix flag on both validate commands
 ```
 
@@ -27,32 +29,77 @@ existing CLI commands grow a flag, and one new domain module handles all the log
 
 ```python
 @dataclasses.dataclass
+class FixSuggestion:
+    """Atomic fix unit — one per CRITICAL violation. Mirrors Violation."""
+    producer_instruction: str   # what the producer must change
+    consumer_instruction: str   # what the consumer must change
+
+@dataclasses.dataclass
 class PairFixSuggestion:
-    producer_fix: str   # consolidated prompt block — producer applies this to satisfy consumer
-    consumer_fix: str   # consolidated prompt block — consumer applies this to satisfy producer
+    producer_id: str
+    consumer_id: str
+    suggestions: list[FixSuggestion]   # mirrors PairViolations.violations
+
+    @property
+    def producer_fix(self) -> str:
+        """Consolidated numbered prompt block for the producer side."""
+        ...  # assembled by _build_block from [s.producer_instruction for s in suggestions]
+
+    @property
+    def consumer_fix(self) -> str:
+        """Consolidated numbered prompt block for the consumer side."""
+        ...  # assembled by _build_block from [s.consumer_instruction for s in suggestions]
+
+@dataclasses.dataclass
+class ContractFixReport:
+    topic: str
+    pairs: list[PairFixSuggestion]   # sparse — only pairs with CRITICAL violations
+
+@dataclasses.dataclass
+class ContractsFixReport:
+    topics: list[ContractFixReport]  # sparse — only topics with at least one failing pair
+
+    @property
+    def has_suggestions(self) -> bool:
+        return len(self.topics) > 0
 ```
+
+`producer_fix` and `consumer_fix` are **computed properties** — they call `_build_block`
+at access time. `suggestions` is the single source of truth; the rendered strings are derived
+from it, so there is no redundant storage.
+
+The fix report is a **sparse view** of the validation report. Topics where all pairs pass are
+omitted from `ContractsFixReport.topics`. Pairs with no CRITICAL violations are omitted from
+`ContractFixReport.pairs`. This means the CLI renderer can iterate the fix report without any
+conditional skipping — everything present needs to be printed.
 
 ### Public Interface
 
 ```python
-def suggest_fixes(pair: PairViolations) -> PairFixSuggestion | None:
+def suggest_fixes(report: ContractsValidationReport) -> ContractsFixReport:
     ...
 ```
 
-Returns `None` when the pair has no CRITICAL violations — caller skips rendering entirely.
+Always returns a `ContractsFixReport` — never `None`. An empty `ContractsFixReport(topics=[])`
+represents "no suggestions". The caller checks `fix_report.has_suggestions` before rendering.
 
 ### Internal Call Chain
 
 ```
-suggest_fixes(pair)
-  └── filters violations to CRITICAL only
-  └── for each violation → _instruction_for(violation) → (producer_instr: str, consumer_instr: str)
-  └── _build_block(class_name, counterpart_id, producer_instrs) → producer_fix
-  └── _build_block(class_name, counterpart_id, consumer_instrs) → consumer_fix
+suggest_fixes(report: ContractsValidationReport)
+  └── for each ContractReport → _suggest_contract_fixes(contract_report) → ContractFixReport | None
+        └── for each PairViolations → _suggest_pair_fixes(pair) → PairFixSuggestion | None
+              └── filters violations to CRITICAL only; returns None if none remain
+              └── for each CRITICAL violation → _instruction_for(violation) → FixSuggestion | None
+              └── PairFixSuggestion(producer_id, consumer_id, suggestions=[...FixSuggestions...])
+                    └── .producer_fix  (property) → _build_block(producer_id, consumer_id, producer_instrs)
+                    └── .consumer_fix  (property) → _build_block(consumer_id, producer_id, consumer_instrs)
+        └── returns None when all pairs in the topic returned None (no failing pairs)
+  └── ContractsFixReport(topics=[...only ContractFixReports that are not None...])
 ```
 
-`_build_block` extracts the bare class name from `schema_id` (e.g. `"my-service/OrderSchema"`
-→ `"OrderSchema"`) for use in the message header.
+`_build_block` extracts the bare class name from `schema_id` via `rsplit("/", 1)[1]`
+(e.g. `"my-service/OrderSchema"` → `"OrderSchema"`) for use in the message header.
 
 ### Block Format
 
@@ -93,7 +140,7 @@ All data required for each instruction is already present in `violation.producer
 
 > **Rules not covered:** `COUNTERPART_MISMATCH` (WARNING severity, workflow issue — not a
 > schema change) produces no fix suggestion. `_instruction_for` returns `None` for this rule;
-> the caller filters it out before assembly.
+> `_suggest_pair_fixes` filters it out before assembly.
 
 
 ---
@@ -109,9 +156,11 @@ All data required for each instruction is already present in `violation.producer
 
 ### Rendering Logic
 
-Fix suggestions are rendered by a dedicated `print_fix_suggestions(report, *, local_name)` function,
-called from the CLI command after `print_report` when `--how-to-fix` is passed. `print_report`
-is not modified — the two concerns are fully separate.
+When `--how-to-fix` is passed, the CLI calls `suggest_fixes(validation_report)` once to obtain
+a `ContractsFixReport`, then passes it to `print_fix_suggestions`. No domain calls happen inside
+the renderer — it purely walks the pre-built structure.
+
+`print_report` is not modified — the two concerns are fully separate.
 
 The output mirrors the structure of `print_report`: topic as the top-level grouping, pair header
 on the next level, fix blocks indented underneath — so the developer can scan both outputs with
@@ -169,10 +218,11 @@ Fix Suggestions
 
 ### Passing `local_name` to the Renderer
 
-`print_fix_suggestions(report, *, local_name: str | None)` receives the local repository name
-(`config.name`). The renderer iterates `report.reports` (each a `ContractReport`) to get the
-topic, then iterates `contract_report.pairs` beneath it — the same two-level loop used by
-`print_report`.
+`print_fix_suggestions(fix_report: ContractsFixReport, *, local_name: str | None)` receives a
+pre-built `ContractsFixReport`. The renderer iterates `fix_report.topics` (each a
+`ContractFixReport`) for the topic line, then `contract_fix_report.pairs` (each a
+`PairFixSuggestion`) beneath it. Because `ContractsFixReport` is sparse, every topic and pair
+present in the structure has suggestions — no conditional skipping is needed.
 
 When `local_name` is `None` (published mode), the renderer uses symmetrical "Producer / Consumer"
 labels with no inference. `config.name` is already available from `Config()` — no extra
@@ -192,20 +242,23 @@ loading or class inspection needed.
   │     └── for each ContractReport → topic header
   │           └── for each PairViolations → pair header + violations (unchanged)
   │
-  ├── [CLI] print_fix_suggestions(report, local_name=config.name)
-  │     └── "Fix Suggestions" header
-  │         └── for each ContractReport → topic line  (mirrors print_report)
-  │               └── for each PairViolations:
-  │                     ├── pair header  (mirrors print_report)
-  │                     ├── infer local side via producer_id.startswith(local_name+"/")
-  │                     └── domain: suggest_fixes(pair) → PairFixSuggestion | None
-  │                           └── render two indented fix blocks with context-aware labels
+  ├── [CLI] domain: suggest_fixes(report) → ContractsFixReport
+  │     └── 3-level transformation, CRITICAL violations only
+  │           (sparse — passing pairs and empty topics omitted)
   │
+  └── [CLI] print_fix_suggestions(fix_report, local_name=config.name)
+        └── "Fix Suggestions" header
+            └── for each ContractFixReport → topic line
+                  └── for each PairFixSuggestion:
+                        ├── pair header  (pair.producer_id vs pair.consumer_id)
+                        ├── infer local side via pair.producer_id.startswith(local_name+"/")
+                        └── render two indented fix blocks with context-aware labels
+
   └── exit 0 / 1
 ```
 
-`suggest_fixes` is called at render time, not during validation. Validation and suggestion
-generation are fully decoupled — running without `--how-to-fix` has zero overhead.
+`suggest_fixes` is called once before rendering, not per-pair inside the renderer. The renderer
+is a pure structural walk — no domain logic inside it.
 
 ---
 
@@ -214,5 +267,7 @@ generation are fully decoupled — running without `--how-to-fix` has zero overh
 
 | Layer | File | What is tested |
 |---|---|---|
-| Domain | `tests/unit/test_domain/test_fix_suggestions.py` | Per-rule: producer instruction text, consumer instruction text; `suggest_fixes` returns `None` for a passing pair; multi-violation block assembles correctly with numbered list and correct header |
+| Domain (instruction level) | `tests/unit/test_domain/test_fix_suggestions.py` | Per-rule: `_suggest_pair_fixes` returns a `PairFixSuggestion` whose `suggestions[0].producer_instruction` and `suggestions[0].consumer_instruction` match the mapping table in this doc |
+| Domain (block assembly) | `tests/unit/test_domain/test_fix_suggestions.py` | `pair.producer_fix` and `pair.consumer_fix` properties assemble a numbered list under the correct header for a multi-violation pair |
+| Domain (aggregation) | `tests/unit/test_domain/test_fix_suggestions.py` | `suggest_fixes` returns `ContractsFixReport(topics=[])` for an all-passing report; topics where all pairs pass are excluded; passing pairs within a failing topic are excluded |
 | CLI | existing CLI integration tests | `--how-to-fix` flag presence and correct label switching (local vs published) |
