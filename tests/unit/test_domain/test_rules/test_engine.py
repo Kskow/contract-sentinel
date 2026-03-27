@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from contract_sentinel.domain.rules.engine import PairViolations, validate_contract
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field, create_schema
 
 
 def _violation(field_path: str = "field") -> Violation:
@@ -19,28 +19,12 @@ def _violation(field_path: str = "field") -> Violation:
     )
 
 
-def _schema(
-    fields_list: list[ContractField],
-    role: str = "producer",
-    unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
-    repository: str = "test-repo",
-) -> ContractSchema:
-    return ContractSchema(
-        topic="orders",
-        role=role,
-        repository=repository,
-        class_name="OrderSchema",
-        unknown=unknown,
-        fields=fields_list,
-    )
-
-
 def _producer(
     fields_list: list[ContractField],
     unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
     repository: str = "producer-repo",
 ) -> ContractSchema:
-    return _schema(fields_list, role="producer", unknown=unknown, repository=repository)
+    return create_schema(fields_list, role="producer", unknown=unknown, repository=repository)
 
 
 def _consumer(
@@ -48,7 +32,7 @@ def _consumer(
     unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
     repository: str = "consumer-repo",
 ) -> ContractSchema:
-    return _schema(fields_list, role="consumer", unknown=unknown, repository=repository)
+    return create_schema(fields_list, role="consumer", unknown=unknown, repository=repository)
 
 
 def _mock_rule(return_value: list[Violation] | None = None) -> MagicMock:
@@ -103,8 +87,8 @@ class TestValidateContract:
     def test_splits_mixed_list_by_role_before_validating(self) -> None:
         result = validate_contract(
             [
-                _producer([field(name="id", type="string")]),
-                _consumer([field(name="id", type="string")]),
+                _producer([create_field(name="id", type="string")]),
+                _consumer([create_field(name="id", type="string")]),
             ]
         )
 
@@ -121,7 +105,7 @@ class TestValidateContract:
         rule = _mock_rule()
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            result = validate_contract([_producer([field(name="id", type="string")])])
+            result = validate_contract([_producer([create_field(name="id", type="string")])])
 
         assert result[0].to_dict() == {
             "producer_id": "producer-repo/OrderSchema",
@@ -143,7 +127,7 @@ class TestValidateContract:
         rule = _mock_rule()
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
-            result = validate_contract([_consumer([field(name="id", type="string")])])
+            result = validate_contract([_consumer([create_field(name="id", type="string")])])
 
         assert result[0].to_dict() == {
             "producer_id": None,
@@ -162,9 +146,9 @@ class TestValidateContract:
         assert rule.check.call_count == 0
 
     def test_runs_pairwise_validation_for_every_producer_consumer_combination(self) -> None:
-        p1 = _producer([field(name="id", type="string")], repository="p1-repo")
-        c1 = _consumer([field(name="id", type="string")], repository="c1-repo")
-        c2 = _consumer([field(name="id", type="string")], repository="c2-repo")
+        p1 = _producer([create_field(name="id", type="string")], repository="p1-repo")
+        c1 = _consumer([create_field(name="id", type="string")], repository="c1-repo")
+        c2 = _consumer([create_field(name="id", type="string")], repository="c2-repo")
 
         rule = _mock_rule()
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
@@ -175,8 +159,8 @@ class TestValidateContract:
     def test_every_rule_is_called_for_a_matched_field(self) -> None:
         rule_a = _mock_rule()
         rule_b = _mock_rule()
-        p_field = field(name="id", type="string")
-        c_field = field(name="id", type="string")
+        p_field = create_field(name="id", type="string")
+        c_field = create_field(name="id", type="string")
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule_a, rule_b]):
             validate_contract([_producer([p_field]), _consumer([c_field])])
@@ -186,10 +170,10 @@ class TestValidateContract:
 
     def test_every_rule_is_called_for_each_field_independently(self) -> None:
         rule = _mock_rule()
-        p_id = field(name="id", type="string")
-        p_name = field(name="name", type="string")
-        c_id = field(name="id", type="string")
-        c_name = field(name="name", type="string")
+        p_id = create_field(name="id", type="string")
+        p_name = create_field(name="name", type="string")
+        c_id = create_field(name="id", type="string")
+        c_name = create_field(name="name", type="string")
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             validate_contract([_producer([p_id, p_name]), _consumer([c_id, c_name])])
@@ -200,7 +184,7 @@ class TestValidateContract:
 
     def test_consumer_only_field_passes_none_as_producer(self) -> None:
         rule = _mock_rule()
-        c_field = field(name="extra", type="string", is_required=False)
+        c_field = create_field(name="extra", type="string", is_required=False)
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             validate_contract([_producer([]), _consumer([c_field])])
@@ -209,7 +193,7 @@ class TestValidateContract:
 
     def test_producer_only_field_passes_none_as_consumer(self) -> None:
         rule = _mock_rule()
-        p_field = field(name="extra", type="string")
+        p_field = create_field(name="extra", type="string")
 
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             validate_contract(
@@ -225,8 +209,8 @@ class TestValidateContract:
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             result = validate_contract(
                 [
-                    _producer([field(name="id", type="string")]),
-                    _consumer([field(name="id", type="string")]),
+                    _producer([create_field(name="id", type="string")]),
+                    _consumer([create_field(name="id", type="string")]),
                 ]
             )
 
@@ -245,8 +229,8 @@ class TestValidateContract:
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             result = validate_contract(
                 [
-                    _producer([field(name="id", type="string"), field(name="name", type="string")]),
-                    _consumer([field(name="id", type="string"), field(name="name", type="string")]),
+                    _producer([create_field(name="id", type="string"), create_field(name="name")]),
+                    _consumer([create_field(name="id", type="string"), create_field(name="name")]),
                 ]
             )
 
@@ -259,20 +243,20 @@ class TestValidateContract:
     def test_violation_path_is_prefixed_at_depth_1(self) -> None:
         producer = _producer(
             [
-                field(
+                create_field(
                     name="address",
                     type="object",
-                    fields=[field(name="lat", type="string")],
+                    fields=[create_field(name="lat", type="string")],
                     unknown=UnknownFieldBehaviour.FORBID,
                 )
             ]
         )
         consumer = _consumer(
             [
-                field(
+                create_field(
                     name="address",
                     type="object",
-                    fields=[field(name="lat", type="number")],
+                    fields=[create_field(name="lat", type="number")],
                     unknown=UnknownFieldBehaviour.FORBID,
                 )
             ]
@@ -301,14 +285,14 @@ class TestValidateContract:
     def test_violation_path_is_prefixed_at_depth_2(self) -> None:
         producer = _producer(
             [
-                field(
+                create_field(
                     name="address",
                     type="object",
                     fields=[
-                        field(
+                        create_field(
                             name="location",
                             type="object",
-                            fields=[field(name="lat", type="string")],
+                            fields=[create_field(name="lat", type="string")],
                             unknown=UnknownFieldBehaviour.FORBID,
                         )
                     ],
@@ -318,14 +302,14 @@ class TestValidateContract:
         )
         consumer = _consumer(
             [
-                field(
+                create_field(
                     name="address",
                     type="object",
                     fields=[
-                        field(
+                        create_field(
                             name="location",
                             type="object",
-                            fields=[field(name="lat", type="number")],
+                            fields=[create_field(name="lat", type="number")],
                             unknown=UnknownFieldBehaviour.FORBID,
                         )
                     ],
@@ -357,15 +341,15 @@ class TestValidateContract:
     def test_skips_recursion_when_field_types_differ(self) -> None:
         producer = _producer(
             [
-                field(
+                create_field(
                     name="data",
                     type="object",
-                    fields=[field(name="id", type="string")],
+                    fields=[create_field(name="id", type="string")],
                     unknown=UnknownFieldBehaviour.FORBID,
                 )
             ]
         )
-        consumer = _consumer([field(name="data", type="array")])
+        consumer = _consumer([create_field(name="data", type="array")])
 
         result = validate_contract([producer, consumer])
 
@@ -389,15 +373,15 @@ class TestValidateContract:
     def test_skips_recursion_when_one_side_has_no_sub_fields(self) -> None:
         producer = _producer(
             [
-                field(
+                create_field(
                     name="data",
                     type="object",
-                    fields=[field(name="id", type="string")],
+                    fields=[create_field(name="id", type="string")],
                     unknown=UnknownFieldBehaviour.FORBID,
                 )
             ]
         )
-        consumer = _consumer([field(name="data", type="object")])
+        consumer = _consumer([create_field(name="data", type="object")])
 
         result = validate_contract([producer, consumer])
 
@@ -409,7 +393,7 @@ class TestValidateContract:
 
     def test_fires_when_producer_only_field_and_consumer_forbids_unknowns(self) -> None:
         producer = _producer(
-            [field(name="internal_id", type="string")],
+            [create_field(name="internal_id", type="string")],
             unknown=UnknownFieldBehaviour.FORBID,
         )
         consumer = _consumer([], unknown=UnknownFieldBehaviour.FORBID)
@@ -437,7 +421,7 @@ class TestValidateContract:
     def test_silent_when_consumer_ignores_unknowns(self) -> None:
         result = validate_contract(
             [
-                _producer([field(name="internal_id", type="string")]),
+                _producer([create_field(name="internal_id", type="string")]),
                 _consumer([], unknown=UnknownFieldBehaviour.IGNORE),
             ]
         )
@@ -451,7 +435,7 @@ class TestValidateContract:
     def test_silent_when_consumer_allows_unknowns(self) -> None:
         result = validate_contract(
             [
-                _producer([field(name="internal_id", type="string")]),
+                _producer([create_field(name="internal_id", type="string")]),
                 _consumer([], unknown=UnknownFieldBehaviour.ALLOW),
             ]
         )

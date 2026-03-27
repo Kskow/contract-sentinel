@@ -1,11 +1,11 @@
 from contract_sentinel.domain.rules import TypeMismatchRule
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field
 
 
 class TestTypeMismatchRule:
     def test_returns_violation_when_types_differ(self) -> None:
-        producer = field(type="string")
-        consumer = field(type="integer")
+        producer = create_field(type="string")
+        consumer = create_field(type="integer")
 
         violations = TypeMismatchRule().check(producer, consumer)
 
@@ -20,18 +20,18 @@ class TestTypeMismatchRule:
         }
 
     def test_returns_empty_when_types_match(self) -> None:
-        f = field(type="string")
+        f = create_field(type="string")
 
         assert TypeMismatchRule().check(f, f) == []
 
     def test_returns_empty_when_both_are_objects(self) -> None:
         # Object-level type match; sub-field differences handled by NestedFieldRule.
-        f = field(type="object")
+        f = create_field(type="object")
 
         assert TypeMismatchRule().check(f, f) == []
 
     def test_returns_empty_when_producer_is_none(self) -> None:
-        assert TypeMismatchRule().check(None, field()) == []
+        assert TypeMismatchRule().check(None, create_field()) == []
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
-        assert TypeMismatchRule().check(field(), None) == []
+        assert TypeMismatchRule().check(create_field(), None) == []

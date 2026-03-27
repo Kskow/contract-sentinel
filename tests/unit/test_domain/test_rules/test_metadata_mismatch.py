@@ -3,22 +3,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.rules import MetadataMismatchRule
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field
 
 if TYPE_CHECKING:
     from contract_sentinel.domain.schema import ContractField
 
 
 def _range_field(name: str = "amount", **range_kwargs: object) -> ContractField:
-    return field(name=name, type="number", metadata={"range": dict(range_kwargs)})
+    return create_field(name=name, type="number", metadata={"range": dict(range_kwargs)})
 
 
 def _len_field(name: str = "username", **length_kwargs: object) -> ContractField:
-    return field(name=name, type="string", metadata={"length": dict(length_kwargs)})
+    return create_field(name=name, type="string", metadata={"length": dict(length_kwargs)})
 
 
 def _enum_field(name: str = "status", allowed: list | None = None) -> ContractField:
-    return field(
+    return create_field(
         name=name,
         type="string",
         metadata={"allowed_values": allowed} if allowed is not None else None,
@@ -27,8 +27,8 @@ def _enum_field(name: str = "status", allowed: list | None = None) -> ContractFi
 
 class TestMetadataMismatchRule:
     def test_returns_violation_per_mismatched_key(self) -> None:
-        producer = field(metadata={"timezone": "utc"})
-        consumer = field(metadata={"timezone": "est"})
+        producer = create_field(metadata={"timezone": "utc"})
+        consumer = create_field(metadata={"timezone": "est"})
 
         violations = MetadataMismatchRule().check(producer, consumer)
 
@@ -46,8 +46,8 @@ class TestMetadataMismatchRule:
         }
 
     def test_returns_multiple_violations_for_multiple_mismatches(self) -> None:
-        producer = field(metadata={"timezone": "utc", "encoding": "utf-8"})
-        consumer = field(metadata={"timezone": "est", "encoding": "ascii"})
+        producer = create_field(metadata={"timezone": "utc", "encoding": "utf-8"})
+        consumer = create_field(metadata={"timezone": "est", "encoding": "ascii"})
 
         violations = MetadataMismatchRule().check(producer, consumer)
 
@@ -76,13 +76,13 @@ class TestMetadataMismatchRule:
         }
 
     def test_returns_empty_when_metadata_matches(self) -> None:
-        f = field(metadata={"timezone": "utc"})
+        f = create_field(metadata={"timezone": "utc"})
 
         assert MetadataMismatchRule().check(f, f) == []
 
     def test_returns_violation_when_producer_metadata_absent_consumer_requires_it(self) -> None:
-        producer = field()
-        consumer = field(metadata={"timezone": "utc"})
+        producer = create_field()
+        consumer = create_field(metadata={"timezone": "utc"})
 
         violations = MetadataMismatchRule().check(producer, consumer)
 
@@ -100,22 +100,22 @@ class TestMetadataMismatchRule:
         }
 
     def test_returns_empty_when_consumer_metadata_is_none(self) -> None:
-        producer = field(metadata={"timezone": "utc"})
-        consumer = field()
+        producer = create_field(metadata={"timezone": "utc"})
+        consumer = create_field()
 
         assert MetadataMismatchRule().check(producer, consumer) == []
 
     def test_ignores_producer_keys_not_declared_by_consumer(self) -> None:
-        producer = field(metadata={"timezone": "utc", "encoding": "utf-8"})
-        consumer = field(metadata={"timezone": "utc"})
+        producer = create_field(metadata={"timezone": "utc", "encoding": "utf-8"})
+        consumer = create_field(metadata={"timezone": "utc"})
 
         assert MetadataMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_producer_is_none(self) -> None:
-        assert MetadataMismatchRule().check(None, field()) == []
+        assert MetadataMismatchRule().check(None, create_field()) == []
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
-        assert MetadataMismatchRule().check(field(), None) == []
+        assert MetadataMismatchRule().check(create_field(), None) == []
 
     def test_allowed_values_returns_violation_when_producer_emits_unaccepted_values(
         self,
@@ -152,7 +152,7 @@ class TestMetadataMismatchRule:
     def test_allowed_values_returns_violation_when_producer_unconstrained_but_consumer_constrained(
         self,
     ) -> None:
-        producer = field(name="status")
+        producer = create_field(name="status")
         consumer = _enum_field(allowed=["active"])
 
         violations = MetadataMismatchRule().check(producer, consumer)
@@ -173,13 +173,13 @@ class TestMetadataMismatchRule:
 
     def test_allowed_values_returns_empty_when_consumer_has_no_allowed_values(self) -> None:
         producer = _enum_field(allowed=["active"])
-        consumer = field(name="status")
+        consumer = create_field(name="status")
 
         assert MetadataMismatchRule().check(producer, consumer) == []
 
     def test_range_returns_empty_when_consumer_has_no_range(self) -> None:
         producer = _range_field(min=0, min_inclusive=True)
-        consumer = field(name="amount", type="number")
+        consumer = create_field(name="amount", type="number")
 
         assert MetadataMismatchRule().check(producer, consumer) == []
 
@@ -211,7 +211,7 @@ class TestMetadataMismatchRule:
     def test_range_returns_violation_when_producer_has_no_range_consumer_has_range(
         self,
     ) -> None:
-        producer = field(name="amount", type="number")
+        producer = create_field(name="amount", type="number")
         consumer = _range_field(min=0, min_inclusive=True, max=100, max_inclusive=True)
 
         violations = MetadataMismatchRule().check(producer, consumer)
@@ -405,7 +405,7 @@ class TestMetadataMismatchRule:
 
     def test_length_returns_empty_when_consumer_has_no_length(self) -> None:
         producer = _len_field(max=500)
-        consumer = field(name="username", type="string")
+        consumer = create_field(name="username", type="string")
 
         assert MetadataMismatchRule().check(producer, consumer) == []
 
@@ -430,7 +430,7 @@ class TestMetadataMismatchRule:
     def test_length_returns_violation_when_producer_has_no_length_consumer_has_length(
         self,
     ) -> None:
-        producer = field(name="username", type="string")
+        producer = create_field(name="username", type="string")
         consumer = _len_field(min=3, max=50)
 
         violations = MetadataMismatchRule().check(producer, consumer)

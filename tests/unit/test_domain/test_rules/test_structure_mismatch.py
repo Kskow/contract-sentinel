@@ -1,13 +1,13 @@
 from contract_sentinel.domain.rules.structure_mismatch import StructureMismatchRule
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field
 
 
 class TestStructureMismatchRule:
     def test_returns_violation_when_producer_is_open_map_and_consumer_has_fixed_schema_object(
         self,
     ) -> None:
-        producer = field(name="payload", type="object", fields=None)
-        consumer = field(name="payload", type="object", fields=[field()])
+        producer = create_field(name="payload", type="object", fields=None)
+        consumer = create_field(name="payload", type="object", fields=[create_field()])
 
         violations = StructureMismatchRule().check(producer, consumer)
 
@@ -27,8 +27,8 @@ class TestStructureMismatchRule:
     def test_returns_violation_when_producer_is_open_map_and_consumer_has_fixed_schema_array(
         self,
     ) -> None:
-        producer = field(name="items", type="array", fields=None)
-        consumer = field(name="items", type="array", fields=[field()])
+        producer = create_field(name="items", type="array", fields=None)
+        consumer = create_field(name="items", type="array", fields=[create_field()])
 
         violations = StructureMismatchRule().check(producer, consumer)
 
@@ -46,41 +46,41 @@ class TestStructureMismatchRule:
         }
 
     def test_returns_empty_when_producer_has_fixed_schema_and_consumer_is_open_map(self) -> None:
-        producer = field(name="payload", type="object", fields=[field()])
-        consumer = field(name="payload", type="object", fields=None)
+        producer = create_field(name="payload", type="object", fields=[create_field()])
+        consumer = create_field(name="payload", type="object", fields=None)
 
         assert StructureMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_both_have_fixed_schema(self) -> None:
-        producer = field(name="payload", type="object", fields=[field()])
-        consumer = field(name="payload", type="object", fields=[field()])
+        producer = create_field(name="payload", type="object", fields=[create_field()])
+        consumer = create_field(name="payload", type="object", fields=[create_field()])
 
         assert StructureMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_neither_has_fields(self) -> None:
-        producer = field(name="payload", type="object", fields=None)
-        consumer = field(name="payload", type="object", fields=None)
+        producer = create_field(name="payload", type="object", fields=None)
+        consumer = create_field(name="payload", type="object", fields=None)
 
         assert StructureMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_types_differ(self) -> None:
-        producer = field(name="payload", type="object", fields=None)
-        consumer = field(name="payload", type="array", fields=[field()])
+        producer = create_field(name="payload", type="object", fields=None)
+        consumer = create_field(name="payload", type="array", fields=[create_field()])
 
         assert StructureMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_type_is_non_structural(self) -> None:
-        producer = field(name="payload", type="string", fields=None)
-        consumer = field(name="payload", type="string", fields=[field()])
+        producer = create_field(name="payload", type="string", fields=None)
+        consumer = create_field(name="payload", type="string", fields=[create_field()])
 
         assert StructureMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_producer_is_none(self) -> None:
-        consumer = field(name="payload", type="object", fields=[field()])
+        consumer = create_field(name="payload", type="object", fields=[create_field()])
 
         assert StructureMismatchRule().check(None, consumer) == []
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
-        producer = field(name="payload", type="object", fields=None)
+        producer = create_field(name="payload", type="object", fields=None)
 
         assert StructureMismatchRule().check(producer, None) == []

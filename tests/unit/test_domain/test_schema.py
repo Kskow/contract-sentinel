@@ -3,6 +3,7 @@ from contract_sentinel.domain.schema import (
     ContractSchema,
     UnknownFieldBehaviour,
 )
+from tests.unit.helpers import create_field
 
 
 class TestContractField:
@@ -42,7 +43,7 @@ class TestContractField:
         assert ContractField.from_dict(expected) == field
 
     def test_to_dict_omits_optional_keys_when_unset(self) -> None:
-        field = ContractField(name="age", type="integer", is_required=False, is_nullable=False)
+        field = create_field("age", "integer", is_required=False)
 
         assert field.to_dict() == {
             "name": "age",
@@ -62,26 +63,14 @@ class TestContractField:
         assert field.is_supported is True
 
     def test_to_dict_serialises_nested_fields_recursively(self) -> None:
-        child = ContractField(name="street", type="string", is_required=True, is_nullable=False)
-        parent = ContractField(
-            name="address",
-            type="object",
-            is_required=True,
-            is_nullable=False,
-            fields=[child],
-        )
+        child = create_field("street")
+        parent = create_field("address", "object", fields=[child])
 
         assert parent.to_dict()["fields"] == [child.to_dict()]
 
     def test_from_dict_round_trip_with_nested_fields(self) -> None:
-        child = ContractField(name="street", type="string", is_required=True, is_nullable=False)
-        parent = ContractField(
-            name="address",
-            type="object",
-            is_required=True,
-            is_nullable=False,
-            fields=[child],
-        )
+        child = create_field("street")
+        parent = create_field("address", "object", fields=[child])
 
         assert ContractField.from_dict(parent.to_dict()) == parent
 

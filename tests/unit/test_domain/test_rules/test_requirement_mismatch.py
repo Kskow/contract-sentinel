@@ -1,11 +1,11 @@
 from contract_sentinel.domain.rules import RequirementMismatchRule
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field
 
 
 class TestRequirementMismatchRule:
     def test_returns_violation_when_producer_optional_consumer_required_no_default(self) -> None:
-        producer = field(is_required=False)
-        consumer = field(is_required=True)
+        producer = create_field(is_required=False)
+        consumer = create_field(is_required=True)
 
         violations = RequirementMismatchRule().check(producer, consumer)
 
@@ -20,18 +20,18 @@ class TestRequirementMismatchRule:
         }
 
     def test_returns_empty_when_both_required(self) -> None:
-        f = field(is_required=True)
+        f = create_field(is_required=True)
 
         assert RequirementMismatchRule().check(f, f) == []
 
     def test_returns_empty_when_consumer_has_load_default(self) -> None:
-        producer = field(is_required=False)
-        consumer = field(is_required=True, metadata={"load_default": "fallback"})
+        producer = create_field(is_required=False)
+        consumer = create_field(is_required=True, metadata={"load_default": "fallback"})
 
         assert RequirementMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_producer_is_none(self) -> None:
-        assert RequirementMismatchRule().check(None, field()) == []
+        assert RequirementMismatchRule().check(None, create_field()) == []
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
-        assert RequirementMismatchRule().check(field(), None) == []
+        assert RequirementMismatchRule().check(create_field(), None) == []
