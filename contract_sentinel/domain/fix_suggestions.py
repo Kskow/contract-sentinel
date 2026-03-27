@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from contract_sentinel.domain.report import FixSuggestionsReport, TopicFixSuggestions
 
 if TYPE_CHECKING:
-    from contract_sentinel.domain.report import ContractReport, ContractsValidationReport
+    from contract_sentinel.domain.report import ContractReport, ValidationReport
     from contract_sentinel.domain.rules.engine import PairViolations
     from contract_sentinel.domain.rules.violation import Violation
 
@@ -30,15 +30,15 @@ class PairFixSuggestion:
 
 
 def build_contracts_fix_report(
-    validation_report: ContractsValidationReport,
+    validation_report: ValidationReport,
 ) -> FixSuggestionsReport:
     """Transform a full validation report into a sparse FixSuggestionsReport."""
-    suggestions_by_topic: list[TopicFixSuggestions] = []
-    for contract_report in validation_report.reports:
+    suggestions: list[TopicFixSuggestions] = []
+    for contract_report in validation_report.contracts:
         fix_report = _suggest_contract_fixes(contract_report)
         if fix_report is not None:
-            suggestions_by_topic.append(fix_report)
-    return FixSuggestionsReport(suggestions_by_topic=suggestions_by_topic)
+            suggestions.append(fix_report)
+    return FixSuggestionsReport(suggestions=suggestions)
 
 
 def _suggest_contract_fixes(contract_report: ContractReport) -> TopicFixSuggestions | None:
@@ -140,11 +140,11 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
         case "DIRECTION_MISMATCH":
             return FixSuggestion(
                 producer_suggestion=(
-                    f"Remove the load-only constraint from field '{path}'"
-                    " so it is included in serialised output."
+                    f"Ensure field '{path}' is included in serialised output"
+                    " (remove any output-exclusion flag)."
                 ),
                 consumer_suggestion=(
-                    f"Mark field '{path}' as dump-only,"
+                    f"Mark field '{path}' as input-only,"
                     " or remove the expectation of receiving it from the producer."
                 ),
             )

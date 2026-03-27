@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.framework import detect_framework
 from contract_sentinel.domain.participant import Role
-from contract_sentinel.domain.report import ContractsValidationReport
+from contract_sentinel.domain.report import ValidationReport
 from contract_sentinel.domain.rules.engine import validate_contract
 from contract_sentinel.domain.schema import ContractSchema
 
@@ -29,23 +29,23 @@ def validate_local_contracts(
     loader: Callable[[], list[type]],
     config: Config,
     topics: list[str] | None = None,
-) -> ContractsValidationReport:
+) -> ValidationReport:
     """Validate local schemas against their published counterparts on the store."""
     topic_filter: set[str] = set(topics) if topics is not None else set()
     found_topics: set[str] = set()
-    contract_reports: list[ContractReport] = []
+    contracts: list[ContractReport] = []
 
     for cls in loader():
         local_schema = parser(detect_framework(cls), config.name).parse(cls)
         if topic_filter and local_schema.topic not in topic_filter:
             continue
         found_topics.add(local_schema.topic)
-        contract_reports.append(_validate_local_contract(store, local_schema))
+        contracts.append(_validate_local_contract(store, local_schema))
 
     for missing in topic_filter - found_topics:
         logger.warning("Topic '%s' was requested but no local schema was found for it.", missing)
 
-    return ContractsValidationReport(reports=contract_reports)
+    return ValidationReport(contracts=contracts)
 
 
 def _validate_local_contract(store: ContractStore, local_schema: ContractSchema) -> ContractReport:
@@ -64,7 +64,7 @@ def _validate_local_contract(store: ContractStore, local_schema: ContractSchema)
 def validate_published_contracts(
     store: ContractStore,
     topics: list[str] | None = None,
-) -> ContractsValidationReport:
+) -> ValidationReport:
     """Validate all contracts already published to the store against each other."""
     topic_filter: set[str] = set(topics) if topics is not None else set()
     by_topic: dict[str, list[ContractSchema]] = defaultdict(list)
@@ -78,6 +78,4 @@ def validate_published_contracts(
     for missing in topic_filter - set(by_topic):
         logger.warning("Topic '%s' was requested but no published contract was found.", missing)
 
-    return ContractsValidationReport(
-        reports=[validate_contract(schemas) for schemas in by_topic.values()]
-    )
+    return ValidationReport(contracts=[validate_contract(schemas) for schemas in by_topic.values()])

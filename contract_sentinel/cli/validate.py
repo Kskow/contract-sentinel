@@ -10,8 +10,8 @@ from contract_sentinel.config import Config
 from contract_sentinel.domain.fix_suggestions import build_contracts_fix_report
 from contract_sentinel.domain.loader import load_marked_classes
 from contract_sentinel.domain.report import (
-    ContractsValidationReport,
     FixSuggestionsReport,
+    ValidationReport,
     ValidationStatus,
 )
 from contract_sentinel.factory import get_parser, get_store
@@ -88,13 +88,13 @@ def validate_published_contracts(
         raise typer.Exit(code=1)
 
 
-def print_validation_report(report: ContractsValidationReport, *, verbose: bool = False) -> None:
-    """Print a ContractsValidationReport to stdout in a human-readable format."""
+def print_validation_report(report: ValidationReport, *, verbose: bool = False) -> None:
+    """Print a ValidationReport to stdout in a human-readable format."""
     header = f"\nContract Validation — {report.status}\n"
     if report.status == ValidationStatus.FAILED:
         header = typer.style(header, fg=typer.colors.RED)
     typer.echo(header)
-    for contract_report in report.reports:
+    for contract_report in report.contracts:
         if not verbose and contract_report.status == ValidationStatus.PASSED:
             continue
 
@@ -128,7 +128,7 @@ def print_fix_suggestions_report(
 
     typer.echo("\nFix Suggestions\n")
 
-    for topic in fix_report.suggestions_by_topic:
+    for topic in fix_report.suggestions:
         typer.echo(f"  {topic.topic}")
         for pair in topic.pairs:
             typer.echo(f"\n       {pair.producer_id} vs {pair.consumer_id}\n")

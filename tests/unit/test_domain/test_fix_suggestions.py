@@ -9,9 +9,9 @@ from contract_sentinel.domain.fix_suggestions import (
 )
 from contract_sentinel.domain.report import (
     ContractReport,
-    ContractsValidationReport,
     FixSuggestionsReport,
     TopicFixSuggestions,
+    ValidationReport,
 )
 from contract_sentinel.domain.rules.engine import PairViolations
 from tests.unit.helpers import create_violation
@@ -30,9 +30,9 @@ def _pair(violations: list[Violation]) -> PairViolations:
 
 class TestBuildContractsFixReport:
     def test_returns_empty_report_when_no_violations(self) -> None:
-        report = ContractsValidationReport(reports=[ContractReport(topic="orders", pairs=[])])
+        report = ValidationReport(contracts=[ContractReport(topic="orders", pairs=[])])
 
-        assert build_contracts_fix_report(report) == FixSuggestionsReport(suggestions_by_topic=[])
+        assert build_contracts_fix_report(report) == FixSuggestionsReport(suggestions=[])
 
     def test_excludes_topics_where_all_pairs_pass(self) -> None:
         passing_pair = PairViolations(
@@ -45,15 +45,15 @@ class TestBuildContractsFixReport:
             consumer_id="svc-b/PaymentConsumer",
             violations=[create_violation("MISSING_FIELD", field_path="amount")],
         )
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(topic="orders", pairs=[passing_pair]),
                 ContractReport(topic="payments", pairs=[failing_pair]),
             ]
         )
 
         assert build_contracts_fix_report(report) == FixSuggestionsReport(
-            suggestions_by_topic=[
+            suggestions=[
                 TopicFixSuggestions(
                     topic="payments",
                     pairs=[
@@ -88,12 +88,12 @@ class TestBuildContractsFixReport:
             consumer_id="svc-c/OrderConsumer",
             violations=[create_violation("MISSING_FIELD", field_path="amount")],
         )
-        report = ContractsValidationReport(
-            reports=[ContractReport(topic="orders", pairs=[passing_pair, failing_pair])]
+        report = ValidationReport(
+            contracts=[ContractReport(topic="orders", pairs=[passing_pair, failing_pair])]
         )
 
         assert build_contracts_fix_report(report) == FixSuggestionsReport(
-            suggestions_by_topic=[
+            suggestions=[
                 TopicFixSuggestions(
                     topic="orders",
                     pairs=[
@@ -262,13 +262,13 @@ class TestSuggestFixes:
             producer_suggestions=(
                 "In `ProducerSchema`, make the following changes to satisfy the contract"
                 " with repo-b/ConsumerSchema:\n\n"
-                "1. Remove the load-only constraint from field 'token'"
-                " so it is included in serialised output."
+                "1. Ensure field 'token' is included in serialised output"
+                " (remove any output-exclusion flag)."
             ),
             consumer_suggestions=(
                 "In `ConsumerSchema`, make the following changes to satisfy the contract"
                 " with repo-a/ProducerSchema:\n\n"
-                "1. Mark field 'token' as dump-only,"
+                "1. Mark field 'token' as input-only,"
                 " or remove the expectation of receiving it from the producer."
             ),
         )

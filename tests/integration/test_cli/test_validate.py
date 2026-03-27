@@ -12,9 +12,9 @@ from contract_sentinel.cli.validate import print_fix_suggestions_report, print_v
 from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
-    ContractsValidationReport,
     FixSuggestionsReport,
     TopicFixSuggestions,
+    ValidationReport,
 )
 from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.violation import Violation
@@ -67,8 +67,8 @@ class OrderConsumerSchema(ma.Schema):
 
 class TestPrintReport:
     def test_shows_passed_contract_when_verbose(self) -> None:
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(
                     topic="orders",
                     pairs=[
@@ -95,8 +95,8 @@ class TestPrintReport:
         )
 
     def test_hides_passed_contracts_by_default(self) -> None:
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(
                     topic="orders",
                     pairs=[],
@@ -111,8 +111,8 @@ class TestPrintReport:
         assert buf.getvalue() == ("\nContract Validation — PASSED\n\n\n")
 
     def test_shows_failed_contract_with_violation(self) -> None:
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(
                     topic="orders",
                     pairs=[
@@ -153,8 +153,8 @@ class TestPrintReport:
         )
 
     def test_shows_all_violations_for_failed_contract(self) -> None:
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(
                     topic="orders",
                     pairs=[
@@ -208,8 +208,8 @@ class TestPrintReport:
         )
 
     def test_shows_all_topics_when_verbose(self) -> None:
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(
                     topic="orders",
                     pairs=[
@@ -262,7 +262,7 @@ class TestPrintReport:
         )
 
     def test_prints_only_header_when_no_contracts(self) -> None:
-        report = ContractsValidationReport(reports=[])
+        report = ValidationReport(contracts=[])
 
         buf = io.StringIO()
         with redirect_stdout(buf):
@@ -358,6 +358,53 @@ class TestValidateLocal:
             "\n"
         )
 
+    def test_how_to_fix_prints_fix_suggestions_after_validation_report(
+        self,
+        tmp_path: Path,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer(field_type="string"))
+        (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
+
+        result = CliRunner().invoke(
+            app,
+            ["validate-local-contracts", "--path", str(tmp_path), "--how-to-fix"],
+            env=cli_env,
+        )
+
+        assert result.exit_code == 1
+        assert result.output == (
+            "\nContract Validation — FAILED\n"
+            "\n"
+            "  ✗  orders\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+            "\nFix Suggestions\n"
+            "\n"
+            "  orders\n"
+            "\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "\n"
+            "         Fix on their side (Producer) — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderProducerSchema`, make the following changes"
+            " to satisfy the contract with test-repo/OrderConsumerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on your side (Consumer) — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderConsumerSchema`, make the following changes"
+            " to satisfy the contract with orders-service/OrderProducerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+        )
+
 
 class TestValidatePublished:
     def test_passes_when_schemas_are_compatible(
@@ -433,7 +480,7 @@ class TestValidatePublished:
 
 class TestPrintFixSuggestionsReport:
     def test_no_op_when_no_suggestions(self) -> None:
-        report = FixSuggestionsReport(suggestions_by_topic=[])
+        report = FixSuggestionsReport(suggestions=[])
 
         buf = io.StringIO()
         with redirect_stdout(buf):
@@ -457,7 +504,7 @@ class TestPrintFixSuggestionsReport:
             ),
         )
         report = FixSuggestionsReport(
-            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+            suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
         )
 
         buf = io.StringIO()
@@ -504,7 +551,7 @@ class TestPrintFixSuggestionsReport:
             ),
         )
         report = FixSuggestionsReport(
-            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+            suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
         )
 
         buf = io.StringIO()
@@ -551,7 +598,7 @@ class TestPrintFixSuggestionsReport:
             ),
         )
         report = FixSuggestionsReport(
-            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+            suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
         )
 
         buf = io.StringIO()
@@ -600,7 +647,7 @@ class TestPrintFixSuggestionsReport:
             ),
         )
         report = FixSuggestionsReport(
-            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+            suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
         )
 
         buf = io.StringIO()

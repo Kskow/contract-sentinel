@@ -70,7 +70,7 @@ class TestValidateLocalContracts:
             config=_config(),
         )
 
-        assert result.to_dict() == {"status": "PASSED", "reports": []}
+        assert result.to_dict() == {"status": "PASSED", "contracts": []}
 
     def test_returns_passed_for_compatible_pair(self) -> None:
         producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
@@ -85,7 +85,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -113,7 +113,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "FAILED",
@@ -152,7 +152,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -189,7 +189,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [],
+            "contracts": [],
         }
 
     def test_topic_filter_logs_warning_for_missing_topic(
@@ -225,7 +225,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -291,7 +291,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders/created",
                     "status": "PASSED",
@@ -328,7 +328,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -371,7 +371,7 @@ class TestValidatePublishedContracts:
     def test_returns_passed_when_store_is_empty(self) -> None:
         result = validate_published_contracts(store=_store())
 
-        assert result.to_dict() == {"status": "PASSED", "reports": []}
+        assert result.to_dict() == {"status": "PASSED", "contracts": []}
 
     def test_returns_passed_for_compatible_pair(self) -> None:
         producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
@@ -381,7 +381,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -404,7 +404,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "FAILED",
@@ -438,7 +438,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -474,7 +474,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [],
+            "contracts": [],
         }
 
     def test_topic_filter_logs_warning_for_missing_topic(
@@ -503,7 +503,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -543,7 +543,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -592,7 +592,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders/created",
                     "status": "PASSED",
@@ -631,7 +631,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders/created",
                     "status": "PASSED",

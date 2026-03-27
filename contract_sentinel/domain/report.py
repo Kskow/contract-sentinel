@@ -39,23 +39,23 @@ class ContractReport:
 
 
 @dataclasses.dataclass
-class ContractsValidationReport:
+class ValidationReport:
     """Aggregated result across all validated topic groups."""
 
-    reports: list[ContractReport]
+    contracts: list[ContractReport]
 
     @property
     def status(self) -> ValidationStatus:
         """FAILED when at least one ContractReport is FAILED."""
-        for report in self.reports:
-            if report.status == ValidationStatus.FAILED:
+        for contract in self.contracts:
+            if contract.status == ValidationStatus.FAILED:
                 return ValidationStatus.FAILED
         return ValidationStatus.PASSED
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
-            "reports": [report.to_dict() for report in self.reports],
+            "contracts": [contract.to_dict() for contract in self.contracts],
         }
 
 
@@ -71,8 +71,8 @@ class TopicFixSuggestions:
 class FixSuggestionsReport:
     """Sparse fix report — only topics with at least one failing pair."""
 
-    suggestions_by_topic: list[TopicFixSuggestions]
+    suggestions: list[TopicFixSuggestions]
 
     @property
     def has_suggestions(self) -> bool:
-        return len(self.suggestions_by_topic) > 0
+        return len(self.suggestions) > 0

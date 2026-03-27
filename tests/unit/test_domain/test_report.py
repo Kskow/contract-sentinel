@@ -3,9 +3,9 @@ from __future__ import annotations
 from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
-    ContractsValidationReport,
     FixSuggestionsReport,
     TopicFixSuggestions,
+    ValidationReport,
     ValidationStatus,
 )
 from contract_sentinel.domain.rules.engine import PairViolations
@@ -51,7 +51,7 @@ class TestValidationStatus:
         assert ContractReport(topic="orders", pairs=[pair]).status == ValidationStatus.FAILED
 
     def test_contracts_validation_report_status_is_passed_when_all_reports_pass(self) -> None:
-        report = ContractsValidationReport(reports=[ContractReport(topic="orders", pairs=[])])
+        report = ValidationReport(contracts=[ContractReport(topic="orders", pairs=[])])
 
         assert report.status == ValidationStatus.PASSED
 
@@ -61,8 +61,8 @@ class TestValidationStatus:
             consumer_id="svc-b/OrderConsumer",
             violations=[_CRITICAL_VIOLATION],
         )
-        report = ContractsValidationReport(
-            reports=[
+        report = ValidationReport(
+            contracts=[
                 ContractReport(topic="orders", pairs=[]),
                 ContractReport(topic="payments", pairs=[failing_pair]),
             ]
@@ -71,7 +71,7 @@ class TestValidationStatus:
         assert report.status == ValidationStatus.FAILED
 
     def test_contracts_validation_report_status_is_passed_when_empty(self) -> None:
-        assert ContractsValidationReport(reports=[]).status == ValidationStatus.PASSED
+        assert ValidationReport(contracts=[]).status == ValidationStatus.PASSED
 
 
 class TestContractReportToDict:
@@ -118,7 +118,7 @@ class TestContractReportToDict:
 
 class TestFixSuggestionsReport:
     def test_has_suggestions_is_false_when_no_topics(self) -> None:
-        assert FixSuggestionsReport(suggestions_by_topic=[]).has_suggestions is False
+        assert FixSuggestionsReport(suggestions=[]).has_suggestions is False
 
     def test_has_suggestions_is_true_when_at_least_one_topic_is_present(self) -> None:
         pair = PairFixSuggestion(
@@ -128,17 +128,17 @@ class TestFixSuggestionsReport:
             consumer_suggestions="In `OrderConsumer`, make the following changes...\n\n1. Fix it.",
         )
         report = FixSuggestionsReport(
-            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+            suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
         )
 
         assert report.has_suggestions is True
 
 
-class TestContractsValidationReportToDict:
+class TestValidationReportToDict:
     def test_serialises_empty_reports(self) -> None:
-        assert ContractsValidationReport(reports=[]).to_dict() == {
+        assert ValidationReport(contracts=[]).to_dict() == {
             "status": "PASSED",
-            "reports": [],
+            "contracts": [],
         }
 
     def test_serialises_nested_reports_and_pairs(self) -> None:
@@ -148,11 +148,11 @@ class TestContractsValidationReportToDict:
             violations=[_CRITICAL_VIOLATION],
         )
 
-        assert ContractsValidationReport(
-            reports=[ContractReport(topic="orders", pairs=[pair])]
+        assert ValidationReport(
+            contracts=[ContractReport(topic="orders", pairs=[pair])]
         ).to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "FAILED",
