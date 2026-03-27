@@ -29,10 +29,12 @@ class PairFixSuggestion:
     consumer_suggestions: str
 
 
-def build_contracts_fix_report(report: ContractsValidationReport) -> FixSuggestionsReport:
+def build_contracts_fix_report(
+    validation_report: ContractsValidationReport,
+) -> FixSuggestionsReport:
     """Transform a full validation report into a sparse FixSuggestionsReport."""
     suggestions_by_topic: list[TopicFixSuggestions] = []
-    for contract_report in report.reports:
+    for contract_report in validation_report.reports:
         fix_report = _suggest_contract_fixes(contract_report)
         if fix_report is not None:
             suggestions_by_topic.append(fix_report)

@@ -30,9 +30,7 @@ def _pair(violations: list[Violation]) -> PairViolations:
 
 class TestBuildContractsFixReport:
     def test_returns_empty_report_when_no_violations(self) -> None:
-        report = ContractsValidationReport(
-            reports=[ContractReport(topic="orders", pairs=[])]
-        )
+        report = ContractsValidationReport(reports=[ContractReport(topic="orders", pairs=[])])
 
         assert build_contracts_fix_report(report) == FixSuggestionsReport(suggestions_by_topic=[])
 
@@ -455,5 +453,3 @@ class TestSuggestFixes:
                 "1. Change metadata 'format' on field 'created_at' to 'iso8601'."
             ),
         )
-
-

@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING
 from typer.testing import CliRunner
 
 from contract_sentinel.cli.main import app
-from contract_sentinel.cli.validate import print_report
+from contract_sentinel.cli.validate import print_fix_suggestions_report, print_validation_report
+from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
     ContractsValidationReport,
+    FixSuggestionsReport,
+    TopicFixSuggestions,
 )
 from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.violation import Violation
@@ -81,7 +84,7 @@ class TestPrintReport:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            print_report(report, verbose=True)
+            print_validation_report(report, verbose=True)
 
         assert buf.getvalue() == (
             "\nContract Validation — PASSED\n"
@@ -103,7 +106,7 @@ class TestPrintReport:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            print_report(report)
+            print_validation_report(report)
 
         assert buf.getvalue() == ("\nContract Validation — PASSED\n\n\n")
 
@@ -137,7 +140,7 @@ class TestPrintReport:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            print_report(report)
+            print_validation_report(report)
 
         assert buf.getvalue() == (
             "\nContract Validation — FAILED\n"
@@ -190,7 +193,7 @@ class TestPrintReport:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            print_report(report)
+            print_validation_report(report)
 
         assert buf.getvalue() == (
             "\nContract Validation — FAILED\n"
@@ -244,7 +247,7 @@ class TestPrintReport:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            print_report(report, verbose=True)
+            print_validation_report(report, verbose=True)
 
         assert buf.getvalue() == (
             "\nContract Validation — FAILED\n"
@@ -263,7 +266,7 @@ class TestPrintReport:
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            print_report(report)
+            print_validation_report(report)
 
         assert buf.getvalue() == ("\nContract Validation — PASSED\n\n\n")
 
@@ -424,5 +427,208 @@ class TestValidatePublished:
             "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+        )
+
+
+class TestPrintFixSuggestionsReport:
+    def test_no_op_when_no_suggestions(self) -> None:
+        report = FixSuggestionsReport(suggestions_by_topic=[])
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name=None)
+
+        assert buf.getvalue() == ""
+
+    def test_labels_producer_as_local_when_producer_id_matches_local_name(self) -> None:
+        pair = PairFixSuggestion(
+            producer_id="my-service/OrderProducerSchema",
+            consumer_id="other-service/OrderConsumerSchema",
+            producer_suggestions=(
+                "In `OrderProducerSchema`, make the following changes"
+                " to satisfy the contract with other-service/OrderConsumerSchema:\n\n"
+                "1. Change the type of field 'id' from 'string' to 'integer'."
+            ),
+            consumer_suggestions=(
+                "In `OrderConsumerSchema`, make the following changes"
+                " to satisfy the contract with my-service/OrderProducerSchema:\n\n"
+                "1. Change the type of field 'id' from 'integer' to 'string'."
+            ),
+        )
+        report = FixSuggestionsReport(
+            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name="my-service")
+
+        assert buf.getvalue() == (
+            "\nFix Suggestions\n"
+            "\n"
+            "  orders\n"
+            "\n"
+            "       my-service/OrderProducerSchema vs other-service/OrderConsumerSchema\n"
+            "\n"
+            "         Fix on your side (Producer) — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderProducerSchema`, make the following changes"
+            " to satisfy the contract with other-service/OrderConsumerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on their side (Consumer) — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderConsumerSchema`, make the following changes"
+            " to satisfy the contract with my-service/OrderProducerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+        )
+
+    def test_labels_consumer_as_local_when_consumer_id_matches_local_name(self) -> None:
+        pair = PairFixSuggestion(
+            producer_id="other-service/OrderProducerSchema",
+            consumer_id="my-service/OrderConsumerSchema",
+            producer_suggestions=(
+                "In `OrderProducerSchema`, make the following changes"
+                " to satisfy the contract with my-service/OrderConsumerSchema:\n\n"
+                "1. Change the type of field 'id' from 'string' to 'integer'."
+            ),
+            consumer_suggestions=(
+                "In `OrderConsumerSchema`, make the following changes"
+                " to satisfy the contract with other-service/OrderProducerSchema:\n\n"
+                "1. Change the type of field 'id' from 'integer' to 'string'."
+            ),
+        )
+        report = FixSuggestionsReport(
+            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name="my-service")
+
+        assert buf.getvalue() == (
+            "\nFix Suggestions\n"
+            "\n"
+            "  orders\n"
+            "\n"
+            "       other-service/OrderProducerSchema vs my-service/OrderConsumerSchema\n"
+            "\n"
+            "         Fix on their side (Producer) — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderProducerSchema`, make the following changes"
+            " to satisfy the contract with my-service/OrderConsumerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on your side (Consumer) — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderConsumerSchema`, make the following changes"
+            " to satisfy the contract with other-service/OrderProducerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+        )
+
+    def test_uses_generic_labels_when_local_name_is_none(self) -> None:
+        pair = PairFixSuggestion(
+            producer_id="svc-a/OrderProducerSchema",
+            consumer_id="svc-b/OrderConsumerSchema",
+            producer_suggestions=(
+                "In `OrderProducerSchema`, make the following changes"
+                " to satisfy the contract with svc-b/OrderConsumerSchema:\n\n"
+                "1. Change the type of field 'id' from 'string' to 'integer'."
+            ),
+            consumer_suggestions=(
+                "In `OrderConsumerSchema`, make the following changes"
+                " to satisfy the contract with svc-a/OrderProducerSchema:\n\n"
+                "1. Change the type of field 'id' from 'integer' to 'string'."
+            ),
+        )
+        report = FixSuggestionsReport(
+            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name=None)
+
+        assert buf.getvalue() == (
+            "\nFix Suggestions\n"
+            "\n"
+            "  orders\n"
+            "\n"
+            "       svc-a/OrderProducerSchema vs svc-b/OrderConsumerSchema\n"
+            "\n"
+            "         Fix on Producer side — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderProducerSchema`, make the following changes"
+            " to satisfy the contract with svc-b/OrderConsumerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on Consumer side — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderConsumerSchema`, make the following changes"
+            " to satisfy the contract with svc-a/OrderProducerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+        )
+
+    def test_numbers_multiple_violations_in_block(self) -> None:
+        pair = PairFixSuggestion(
+            producer_id="svc-a/OrderProducerSchema",
+            consumer_id="svc-b/OrderConsumerSchema",
+            producer_suggestions=(
+                "In `OrderProducerSchema`, make the following changes"
+                " to satisfy the contract with svc-b/OrderConsumerSchema:\n\n"
+                "1. Change the type of field 'id' from 'string' to 'integer'.\n"
+                "2. Remove the nullable constraint from field 'name'."
+            ),
+            consumer_suggestions=(
+                "In `OrderConsumerSchema`, make the following changes"
+                " to satisfy the contract with svc-a/OrderProducerSchema:\n\n"
+                "1. Change the type of field 'id' from 'integer' to 'string'.\n"
+                "2. Mark field 'name' as nullable."
+            ),
+        )
+        report = FixSuggestionsReport(
+            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name=None)
+
+        assert buf.getvalue() == (
+            "\nFix Suggestions\n"
+            "\n"
+            "  orders\n"
+            "\n"
+            "       svc-a/OrderProducerSchema vs svc-b/OrderConsumerSchema\n"
+            "\n"
+            "         Fix on Producer side — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderProducerSchema`, make the following changes"
+            " to satisfy the contract with svc-b/OrderConsumerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "           2. Remove the nullable constraint from field 'name'.\n"
+            "\n"
+            "         Fix on Consumer side — copy & paste to your agent:\n"
+            "\n"
+            "           In `OrderConsumerSchema`, make the following changes"
+            " to satisfy the contract with svc-a/OrderProducerSchema:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "           2. Mark field 'name' as nullable.\n"
+            "\n"
             "\n"
         )
