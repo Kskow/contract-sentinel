@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
     ContractsValidationReport,
+    FixSuggestionsReport,
+    TopicFixSuggestions,
     ValidationStatus,
 )
 from contract_sentinel.domain.rules.engine import PairViolations
@@ -111,6 +114,24 @@ class TestContractReportToDict:
                 }
             ],
         }
+
+
+class TestFixSuggestionsReport:
+    def test_has_suggestions_is_false_when_no_topics(self) -> None:
+        assert FixSuggestionsReport(suggestions_by_topic=[]).has_suggestions is False
+
+    def test_has_suggestions_is_true_when_at_least_one_topic_is_present(self) -> None:
+        pair = PairFixSuggestion(
+            producer_id="svc-a/OrderSchema",
+            consumer_id="svc-b/OrderConsumer",
+            producer_suggestions="In `OrderSchema`, make the following changes...\n\n1. Fix it.",
+            consumer_suggestions="In `OrderConsumer`, make the following changes...\n\n1. Fix it.",
+        )
+        report = FixSuggestionsReport(
+            suggestions_by_topic=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+        )
+
+        assert report.has_suggestions is True
 
 
 class TestContractsValidationReportToDict:

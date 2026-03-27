@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
     from contract_sentinel.domain.rules.engine import PairViolations
 
 
@@ -56,3 +57,22 @@ class ContractsValidationReport:
             "status": self.status,
             "reports": [report.to_dict() for report in self.reports],
         }
+
+
+@dataclasses.dataclass
+class TopicFixSuggestions:
+    """Fix suggestions for a single topic — only pairs with at least one CRITICAL violation."""
+
+    topic: str
+    pairs: list[PairFixSuggestion]
+
+
+@dataclasses.dataclass
+class FixSuggestionsReport:
+    """Sparse fix report — only topics with at least one failing pair."""
+
+    suggestions_by_topic: list[TopicFixSuggestions]
+
+    @property
+    def has_suggestions(self) -> bool:
+        return len(self.suggestions_by_topic) > 0
