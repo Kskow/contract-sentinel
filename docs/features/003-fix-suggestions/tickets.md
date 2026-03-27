@@ -186,7 +186,7 @@ Add `--how-to-fix` to `sentinel validate-local-contracts` and implement the stan
 
 ---
 
-### TICKET-03 — CLI: `--how-to-fix` on `validate-published-contracts`
+### TICKET-03 — CLI: `--how-to-fix` on `validate-published-contracts` ✅
 
 **Depends on:** TICKET-02
 **Type:** CLI
@@ -199,15 +199,15 @@ with symmetrical "Producer / Consumer" labelling.
 - `contract_sentinel/cli/validate.py` — modify
 
 **Done when:**
-- [ ] `--how-to-fix` flag exists on `sentinel validate-published-contracts` and defaults to `False`.
-- [ ] When `--how-to-fix` is passed, `build_contracts_fix_report(validation_report)` is called
-      once to obtain a `FixSuggestionsReport`, then `print_fix_suggestions(fix_report,
-      local_name=None)` is called after `print_report`.
-- [ ] With `local_name=None`, blocks are labelled `"Fix on Producer side — copy & paste to
+- [x] `--how-to-fix` flag exists on `sentinel validate-published-contracts` and defaults to `False`.
+- [x] When `--how-to-fix` is passed, `build_contracts_fix_report(validation_report)` is called
+      once to obtain a `FixSuggestionsReport`, then `print_fix_suggestions_report(fix_report,
+      local_name=None)` is called after `print_validation_report`.
+- [x] With `local_name=None`, blocks are labelled `"Fix on Producer side — copy & paste to
       your agent:"` and `"Fix on Consumer side — copy & paste to your agent:"` — no "your
       side" language.
-- [ ] Output mirrors `print_report` structure: `"Fix Suggestions"` header, topic lines, pair
-      headers, fix blocks indented underneath.
-- [ ] Running `sentinel validate-published-contracts` without `--how-to-fix` produces output
+- [x] Output mirrors `print_validation_report` structure: `"Fix Suggestions"` header, topic
+      lines, pair headers, fix blocks indented underneath.
+- [x] Running `sentinel validate-published-contracts` without `--how-to-fix` produces output
       identical to before.
-- [ ] `just check` passes.
+- [x] `just check` passes.

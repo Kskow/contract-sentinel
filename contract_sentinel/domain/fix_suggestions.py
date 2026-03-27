@@ -29,7 +29,7 @@ class PairFixSuggestion:
     consumer_suggestions: str
 
 
-def build_contracts_fix_report(
+def generate_fix_suggestions(
     validation_report: ValidationReport,
 ) -> FixSuggestionsReport:
     """Transform a full validation report into a sparse FixSuggestionsReport."""

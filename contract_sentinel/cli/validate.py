@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from contract_sentinel.config import Config
-from contract_sentinel.domain.fix_suggestions import build_contracts_fix_report
+from contract_sentinel.domain.fix_suggestions import generate_fix_suggestions
 from contract_sentinel.domain.loader import load_marked_classes
 from contract_sentinel.domain.report import (
     FixSuggestionsReport,
@@ -60,7 +60,7 @@ def validate_local_contracts(
     print_validation_report(validation_report, verbose=verbose)
 
     if how_to_fix:
-        fix_suggestions_report = build_contracts_fix_report(validation_report)
+        fix_suggestions_report = generate_fix_suggestions(validation_report)
         print_fix_suggestions_report(fix_suggestions_report, local_name=config.name)
 
     if not dry_run and validation_report.status == ValidationStatus.FAILED:
@@ -89,7 +89,7 @@ def validate_published_contracts(
     print_validation_report(report, verbose=verbose)
 
     if how_to_fix:
-        fix_suggestions_report = build_contracts_fix_report(report)
+        fix_suggestions_report = generate_fix_suggestions(report)
         print_fix_suggestions_report(fix_suggestions_report, local_name=None)
 
     if not dry_run and report.status == ValidationStatus.FAILED:
@@ -128,15 +128,15 @@ def print_validation_report(report: ValidationReport, *, verbose: bool = False) 
 
 
 def print_fix_suggestions_report(
-    fix_report: FixSuggestionsReport, *, local_name: str | None
+    suggestion_fix_report: FixSuggestionsReport, *, local_name: str | None
 ) -> None:
     """Print a FixSuggestionsReport to stdout. No-op when there are no suggestions."""
-    if not fix_report.has_suggestions:
+    if not suggestion_fix_report.has_suggestions:
         return
 
     typer.echo("\nFix Suggestions\n")
 
-    for topic in fix_report.suggestions:
+    for topic in suggestion_fix_report.suggestions:
         typer.echo(f"  {topic.topic}")
         for pair in topic.pairs:
             typer.echo(f"\n       {pair.producer_id} vs {pair.consumer_id}\n")
@@ -151,14 +151,13 @@ def print_fix_suggestions_report(
                 producer_label = "Fix on Producer side — copy & paste to your agent:"
                 consumer_label = "Fix on Consumer side — copy & paste to your agent:"
 
-            _print_fix_block(producer_label, pair.producer_suggestions)
-            _print_fix_block(consumer_label, pair.consumer_suggestions)
+            for label, block in (
+                (producer_label, pair.producer_suggestions),
+                (consumer_label, pair.consumer_suggestions),
+            ):
+                typer.echo(f"         {label}\n")
+                for line in block.splitlines():
+                    typer.echo(f"           {line}" if line else "")
+                typer.echo("")
 
-    typer.echo("")
-
-
-def _print_fix_block(label: str, block: str) -> None:
-    typer.echo(f"         {label}\n")
-    for line in block.splitlines():
-        typer.echo(f"           {line}" if line else "")
     typer.echo("")

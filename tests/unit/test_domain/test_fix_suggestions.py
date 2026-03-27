@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.fix_suggestions import (
     PairFixSuggestion,
-    build_contracts_fix_report,
+    generate_fix_suggestions,
     suggest_fixes,
 )
 from contract_sentinel.domain.report import (
@@ -28,11 +28,11 @@ def _pair(violations: list[Violation]) -> PairViolations:
     )
 
 
-class TestBuildContractsFixReport:
+class TestGenerateFixSuggestions:
     def test_returns_empty_report_when_no_violations(self) -> None:
         report = ValidationReport(contracts=[ContractReport(topic="orders", pairs=[])])
 
-        assert build_contracts_fix_report(report) == FixSuggestionsReport(suggestions=[])
+        assert generate_fix_suggestions(report) == FixSuggestionsReport(suggestions=[])
 
     def test_excludes_topics_where_all_pairs_pass(self) -> None:
         passing_pair = PairViolations(
@@ -52,7 +52,7 @@ class TestBuildContractsFixReport:
             ]
         )
 
-        assert build_contracts_fix_report(report) == FixSuggestionsReport(
+        assert generate_fix_suggestions(report) == FixSuggestionsReport(
             suggestions=[
                 TopicFixSuggestions(
                     topic="payments",
@@ -86,7 +86,7 @@ class TestBuildContractsFixReport:
             contracts=[ContractReport(topic="orders", pairs=[passing_pair, failing_pair])]
         )
 
-        assert build_contracts_fix_report(report) == FixSuggestionsReport(
+        assert generate_fix_suggestions(report) == FixSuggestionsReport(
             suggestions=[
                 TopicFixSuggestions(
                     topic="orders",
