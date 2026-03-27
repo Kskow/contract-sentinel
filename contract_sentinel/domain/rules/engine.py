@@ -4,6 +4,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.participant import Role
+from contract_sentinel.domain.report import ContractReport
 from contract_sentinel.domain.rules.counterpart_mismatch import CounterpartMismatchRule
 from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
 from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
@@ -47,15 +48,18 @@ class PairViolations:
         }
 
 
-def validate_contract(schemas: list[ContractSchema]) -> list[PairViolations]:
-    """Split a flat list of schemas by role and validate them as a group.
+def validate_contract(schemas: list[ContractSchema]) -> ContractReport:
+    """Validate a flat list of schemas for one topic and return a ContractReport.
 
-    Convenience entry point over _validate_group — callers pass the full mixed
-    list and role-splitting is handled here rather than at the call site.
+    All schemas must belong to the same topic — callers are responsible for
+    grouping by topic before calling. The topic is extracted from the first schema.
+    Role-splitting is handled here rather than at the call site.
     """
+    topic = schemas[0].topic
     producers = [s for s in schemas if s.role == Role.PRODUCER.value]
     consumers = [s for s in schemas if s.role == Role.CONSUMER.value]
-    return _validate_group(producers, consumers)
+    pairs = _validate_group(producers, consumers)
+    return ContractReport(topic=topic, pairs=pairs)
 
 
 def _validate_group(

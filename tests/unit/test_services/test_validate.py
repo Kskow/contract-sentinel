@@ -6,12 +6,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import marshmallow
 
-from contract_sentinel.domain.rules.engine import PairViolations
-from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.services.validate import (
-    ContractReport,
-    ContractsValidationReport,
-    ValidationStatus,
     validate_local_contracts,
     validate_published_contracts,
 )
@@ -64,132 +59,6 @@ def _config(name: str = "test-repo") -> MagicMock:
     cfg = MagicMock()
     cfg.name = name
     return cfg
-
-
-class TestContractReportToDict:
-    def test_serialises_empty_pairs(self) -> None:
-        report = ContractReport(topic="orders", status=ValidationStatus.PASSED, pairs=[])
-
-        assert report.to_dict() == {
-            "topic": "orders",
-            "status": "PASSED",
-            "pairs": [],
-        }
-
-    def test_serialises_pairs_with_violations(self) -> None:
-        report = ContractReport(
-            topic="orders",
-            status=ValidationStatus.FAILED,
-            pairs=[
-                PairViolations(
-                    producer_id="orders-service/OrderSchema",
-                    consumer_id="checkout-service/OrderSchema",
-                    violations=[
-                        Violation(
-                            rule="TYPE_MISMATCH",
-                            severity="CRITICAL",
-                            field_path="id",
-                            producer={"type": "string"},
-                            consumer={"type": "integer"},
-                            message=(
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
-                        )
-                    ],
-                )
-            ],
-        )
-
-        assert report.to_dict() == {
-            "topic": "orders",
-            "status": "FAILED",
-            "pairs": [
-                {
-                    "producer_id": "orders-service/OrderSchema",
-                    "consumer_id": "checkout-service/OrderSchema",
-                    "violations": [
-                        {
-                            "rule": "TYPE_MISMATCH",
-                            "severity": "CRITICAL",
-                            "field_path": "id",
-                            "producer": {"type": "string"},
-                            "consumer": {"type": "integer"},
-                            "message": (
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
-                        }
-                    ],
-                }
-            ],
-        }
-
-
-class TestContractsValidationReportToDict:
-    def test_serialises_empty_reports(self) -> None:
-        report = ContractsValidationReport(status=ValidationStatus.PASSED, reports=[])
-
-        assert report.to_dict() == {"status": "PASSED", "reports": []}
-
-    def test_serialises_nested_reports_and_pairs(self) -> None:
-        report = ContractsValidationReport(
-            status=ValidationStatus.FAILED,
-            reports=[
-                ContractReport(
-                    topic="orders",
-                    status=ValidationStatus.FAILED,
-                    pairs=[
-                        PairViolations(
-                            producer_id="orders-service/OrderSchema",
-                            consumer_id="checkout-service/OrderSchema",
-                            violations=[
-                                Violation(
-                                    rule="TYPE_MISMATCH",
-                                    severity="CRITICAL",
-                                    field_path="id",
-                                    producer={"type": "string"},
-                                    consumer={"type": "integer"},
-                                    message=(
-                                        "Field 'id' is a 'string' in Producer"
-                                        " but Consumer expects a 'integer'."
-                                    ),
-                                )
-                            ],
-                        )
-                    ],
-                )
-            ],
-        )
-
-        assert report.to_dict() == {
-            "status": "FAILED",
-            "reports": [
-                {
-                    "topic": "orders",
-                    "status": "FAILED",
-                    "pairs": [
-                        {
-                            "producer_id": "orders-service/OrderSchema",
-                            "consumer_id": "checkout-service/OrderSchema",
-                            "violations": [
-                                {
-                                    "rule": "TYPE_MISMATCH",
-                                    "severity": "CRITICAL",
-                                    "field_path": "id",
-                                    "producer": {"type": "string"},
-                                    "consumer": {"type": "integer"},
-                                    "message": (
-                                        "Field 'id' is a 'string' in Producer"
-                                        " but Consumer expects a 'integer'."
-                                    ),
-                                }
-                            ],
-                        }
-                    ],
-                }
-            ],
-        }
 
 
 class TestValidateLocalContracts:

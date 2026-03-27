@@ -92,14 +92,17 @@ class TestValidateContract:
             ]
         )
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [],
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "PASSED",
+            "pairs": [
+                {
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [],
+                }
+            ],
         }
-
-    def test_returns_empty_list_for_empty_input(self) -> None:
-        assert validate_contract([]) == []
 
     def test_returns_counterpart_violation_when_producer_has_no_consumer(self) -> None:
         rule = _mock_rule()
@@ -107,17 +110,23 @@ class TestValidateContract:
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             result = validate_contract([_producer([create_field(name="id", type="string")])])
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": None,
-            "violations": [
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "PASSED",
+            "pairs": [
                 {
-                    "rule": "COUNTERPART_MISMATCH",
-                    "severity": "WARNING",
-                    "field_path": "",
-                    "producer": {},
-                    "consumer": {},
-                    "message": ("Topic 'orders' has 1 producer(s) but no matching consumer."),
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": None,
+                    "violations": [
+                        {
+                            "rule": "COUNTERPART_MISMATCH",
+                            "severity": "WARNING",
+                            "field_path": "",
+                            "producer": {},
+                            "consumer": {},
+                            "message": "Topic 'orders' has 1 producer(s) but no matching consumer.",
+                        }
+                    ],
                 }
             ],
         }
@@ -129,17 +138,23 @@ class TestValidateContract:
         with patch("contract_sentinel.domain.rules.engine.PAIR_RULES", [rule]):
             result = validate_contract([_consumer([create_field(name="id", type="string")])])
 
-        assert result[0].to_dict() == {
-            "producer_id": None,
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "PASSED",
+            "pairs": [
                 {
-                    "rule": "COUNTERPART_MISMATCH",
-                    "severity": "WARNING",
-                    "field_path": "",
-                    "producer": {},
-                    "consumer": {},
-                    "message": ("Topic 'orders' has 1 consumer(s) but no matching producer."),
+                    "producer_id": None,
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [
+                        {
+                            "rule": "COUNTERPART_MISMATCH",
+                            "severity": "WARNING",
+                            "field_path": "",
+                            "producer": {},
+                            "consumer": {},
+                            "message": "Topic 'orders' has 1 consumer(s) but no matching producer.",
+                        }
+                    ],
                 }
             ],
         }
@@ -214,10 +229,16 @@ class TestValidateContract:
                 ]
             )
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [violation.to_dict()],
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "FAILED",
+            "pairs": [
+                {
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [violation.to_dict()],
+                }
+            ],
         }
 
     def test_violations_from_multiple_fields_are_aggregated(self) -> None:
@@ -234,10 +255,16 @@ class TestValidateContract:
                 ]
             )
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [v1.to_dict(), v2.to_dict()],
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "FAILED",
+            "pairs": [
+                {
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [v1.to_dict(), v2.to_dict()],
+                }
+            ],
         }
 
     def test_violation_path_is_prefixed_at_depth_1(self) -> None:
@@ -264,20 +291,26 @@ class TestValidateContract:
 
         result = validate_contract([producer, consumer])
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "FAILED",
+            "pairs": [
                 {
-                    "rule": "TYPE_MISMATCH",
-                    "severity": "CRITICAL",
-                    "field_path": "address.lat",
-                    "producer": {"type": "string"},
-                    "consumer": {"type": "number"},
-                    "message": (
-                        "Field 'address.lat' is a 'string' in Producer"
-                        " but Consumer expects a 'number'."
-                    ),
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [
+                        {
+                            "rule": "TYPE_MISMATCH",
+                            "severity": "CRITICAL",
+                            "field_path": "address.lat",
+                            "producer": {"type": "string"},
+                            "consumer": {"type": "number"},
+                            "message": (
+                                "Field 'address.lat' is a 'string' in Producer"
+                                " but Consumer expects a 'number'."
+                            ),
+                        }
+                    ],
                 }
             ],
         }
@@ -320,20 +353,26 @@ class TestValidateContract:
 
         result = validate_contract([producer, consumer])
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "FAILED",
+            "pairs": [
                 {
-                    "rule": "TYPE_MISMATCH",
-                    "severity": "CRITICAL",
-                    "field_path": "address.location.lat",
-                    "producer": {"type": "string"},
-                    "consumer": {"type": "number"},
-                    "message": (
-                        "Field 'address.location.lat' is a 'string' in Producer"
-                        " but Consumer expects a 'number'."
-                    ),
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [
+                        {
+                            "rule": "TYPE_MISMATCH",
+                            "severity": "CRITICAL",
+                            "field_path": "address.location.lat",
+                            "producer": {"type": "string"},
+                            "consumer": {"type": "number"},
+                            "message": (
+                                "Field 'address.location.lat' is a 'string' in Producer"
+                                " but Consumer expects a 'number'."
+                            ),
+                        }
+                    ],
                 }
             ],
         }
@@ -353,19 +392,26 @@ class TestValidateContract:
 
         result = validate_contract([producer, consumer])
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "FAILED",
+            "pairs": [
                 {
-                    "rule": "TYPE_MISMATCH",
-                    "severity": "CRITICAL",
-                    "field_path": "data",
-                    "producer": {"type": "object"},
-                    "consumer": {"type": "array"},
-                    "message": (
-                        "Field 'data' is a 'object' in Producer but Consumer expects a 'array'."
-                    ),
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [
+                        {
+                            "rule": "TYPE_MISMATCH",
+                            "severity": "CRITICAL",
+                            "field_path": "data",
+                            "producer": {"type": "object"},
+                            "consumer": {"type": "array"},
+                            "message": (
+                                "Field 'data' is a 'object' in Producer"
+                                " but Consumer expects a 'array'."
+                            ),
+                        }
+                    ],
                 }
             ],
         }
@@ -385,10 +431,16 @@ class TestValidateContract:
 
         result = validate_contract([producer, consumer])
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [],
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "PASSED",
+            "pairs": [
+                {
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [],
+                }
+            ],
         }
 
     def test_fires_when_producer_only_field_and_consumer_forbids_unknowns(self) -> None:
@@ -400,20 +452,26 @@ class TestValidateContract:
 
         result = validate_contract([producer, consumer])
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "FAILED",
+            "pairs": [
                 {
-                    "rule": "UNDECLARED_FIELD",
-                    "severity": "CRITICAL",
-                    "field_path": "internal_id",
-                    "producer": {"exists": True},
-                    "consumer": {"exists": False, "unknown": "forbid"},
-                    "message": (
-                        "Field 'internal_id' is sent by Producer but is not declared"
-                        " in Consumer (unknown=forbid)."
-                    ),
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [
+                        {
+                            "rule": "UNDECLARED_FIELD",
+                            "severity": "CRITICAL",
+                            "field_path": "internal_id",
+                            "producer": {"exists": True},
+                            "consumer": {"exists": False, "unknown": "forbid"},
+                            "message": (
+                                "Field 'internal_id' is sent by Producer but is not declared"
+                                " in Consumer (unknown=forbid)."
+                            ),
+                        }
+                    ],
                 }
             ],
         }
@@ -426,10 +484,16 @@ class TestValidateContract:
             ]
         )
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [],
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "PASSED",
+            "pairs": [
+                {
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [],
+                }
+            ],
         }
 
     def test_silent_when_consumer_allows_unknowns(self) -> None:
@@ -440,8 +504,14 @@ class TestValidateContract:
             ]
         )
 
-        assert result[0].to_dict() == {
-            "producer_id": "producer-repo/OrderSchema",
-            "consumer_id": "consumer-repo/OrderSchema",
-            "violations": [],
+        assert result.to_dict() == {
+            "topic": "orders",
+            "status": "PASSED",
+            "pairs": [
+                {
+                    "producer_id": "producer-repo/OrderSchema",
+                    "consumer_id": "consumer-repo/OrderSchema",
+                    "violations": [],
+                }
+            ],
         }

@@ -9,14 +9,13 @@ from typer.testing import CliRunner
 
 from contract_sentinel.cli.main import app
 from contract_sentinel.cli.validate import print_report
+from contract_sentinel.domain.report import (
+    ContractReport,
+    ContractsValidationReport,
+)
 from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
-from contract_sentinel.services.validate import (
-    ContractReport,
-    ContractsValidationReport,
-    ValidationStatus,
-)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -66,11 +65,9 @@ class OrderConsumerSchema(ma.Schema):
 class TestPrintReport:
     def test_shows_passed_contract_when_verbose(self) -> None:
         report = ContractsValidationReport(
-            status=ValidationStatus.PASSED,
             reports=[
                 ContractReport(
                     topic="orders",
-                    status=ValidationStatus.PASSED,
                     pairs=[
                         PairViolations(
                             producer_id="orders-service/OrderProducerSchema",
@@ -96,11 +93,9 @@ class TestPrintReport:
 
     def test_hides_passed_contracts_by_default(self) -> None:
         report = ContractsValidationReport(
-            status=ValidationStatus.PASSED,
             reports=[
                 ContractReport(
                     topic="orders",
-                    status=ValidationStatus.PASSED,
                     pairs=[],
                 )
             ],
@@ -114,11 +109,9 @@ class TestPrintReport:
 
     def test_shows_failed_contract_with_violation(self) -> None:
         report = ContractsValidationReport(
-            status=ValidationStatus.FAILED,
             reports=[
                 ContractReport(
                     topic="orders",
-                    status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
                             producer_id="orders-service/OrderProducerSchema",
@@ -158,11 +151,9 @@ class TestPrintReport:
 
     def test_shows_all_violations_for_failed_contract(self) -> None:
         report = ContractsValidationReport(
-            status=ValidationStatus.FAILED,
             reports=[
                 ContractReport(
                     topic="orders",
-                    status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
                             producer_id="orders-service/OrderProducerSchema",
@@ -215,11 +206,9 @@ class TestPrintReport:
 
     def test_shows_all_topics_when_verbose(self) -> None:
         report = ContractsValidationReport(
-            status=ValidationStatus.FAILED,
             reports=[
                 ContractReport(
                     topic="orders",
-                    status=ValidationStatus.PASSED,
                     pairs=[
                         PairViolations(
                             producer_id="orders-service/OrderProducerSchema",
@@ -230,7 +219,6 @@ class TestPrintReport:
                 ),
                 ContractReport(
                     topic="payments",
-                    status=ValidationStatus.FAILED,
                     pairs=[
                         PairViolations(
                             producer_id="payments-service/PaymentProducerSchema",
@@ -271,7 +259,7 @@ class TestPrintReport:
         )
 
     def test_prints_only_header_when_no_contracts(self) -> None:
-        report = ContractsValidationReport(status=ValidationStatus.PASSED, reports=[])
+        report = ContractsValidationReport(reports=[])
 
         buf = io.StringIO()
         with redirect_stdout(buf):

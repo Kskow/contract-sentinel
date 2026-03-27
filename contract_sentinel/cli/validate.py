@@ -8,11 +8,8 @@ import typer
 
 from contract_sentinel.config import Config
 from contract_sentinel.domain.loader import load_marked_classes
+from contract_sentinel.domain.report import ContractsValidationReport, ValidationStatus
 from contract_sentinel.factory import get_parser, get_store
-from contract_sentinel.services.validate import (
-    ContractsValidationReport,
-    ValidationStatus,
-)
 from contract_sentinel.services.validate import (
     validate_local_contracts as service_validate_local_contracts,
 )

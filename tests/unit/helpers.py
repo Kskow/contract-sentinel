@@ -1,8 +1,25 @@
-"""Shared test helpers for unit test modules."""
-
 from __future__ import annotations
 
+from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
+
+
+def create_violation(
+    rule: str,
+    severity: str = "CRITICAL",
+    field_path: str = "field_name",
+    producer: dict | None = None,
+    consumer: dict | None = None,
+    message: str = "",
+) -> Violation:
+    return Violation(
+        rule=rule,
+        severity=severity,
+        field_path=field_path,
+        producer=producer or {},
+        consumer=consumer or {},
+        message=message,
+    )
 
 
 def create_field(
