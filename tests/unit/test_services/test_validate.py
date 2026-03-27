@@ -8,7 +8,6 @@ import marshmallow
 
 from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.violation import Violation
-from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 from contract_sentinel.services.validate import (
     ContractReport,
     ContractsValidationReport,
@@ -16,11 +15,13 @@ from contract_sentinel.services.validate import (
     validate_local_contracts,
     validate_published_contracts,
 )
+from tests.unit.helpers import create_field, create_schema
 
 if TYPE_CHECKING:
     import pytest
 
     from contract_sentinel.adapters.contract_store import ContractStore
+    from contract_sentinel.domain.schema import ContractSchema
 
 
 class _MarshmallowClass(marshmallow.Schema):
@@ -29,26 +30,6 @@ class _MarshmallowClass(marshmallow.Schema):
 
 class _OtherMarshmallowClass(marshmallow.Schema):
     """Another minimal class."""
-
-
-def _field(name: str = "id", type_: str = "string") -> ContractField:
-    return ContractField(name=name, type=type_, is_required=True, is_nullable=False)
-
-
-def _schema(
-    *,
-    topic: str = "orders",
-    role: str = "producer",
-    fields: list[ContractField] | None = None,
-) -> ContractSchema:
-    return ContractSchema(
-        topic=topic,
-        role=role,
-        repository="test-repo",
-        class_name="OrderSchema",
-        unknown=UnknownFieldBehaviour.FORBID,
-        fields=fields or [],
-    )
 
 
 def _store(*schemas: ContractSchema) -> ContractStore:
@@ -215,7 +196,7 @@ class TestValidateLocalContracts:
     def test_returns_passed_when_no_local_classes(self) -> None:
         result = validate_local_contracts(
             store=_store(),
-            parser=_parser(_schema()),
+            parser=_parser(create_schema()),
             loader=lambda: [],
             config=_config(),
         )
@@ -223,8 +204,8 @@ class TestValidateLocalContracts:
         assert result.to_dict() == {"status": "PASSED", "reports": []}
 
     def test_returns_passed_for_compatible_pair(self) -> None:
-        producer_schema = _schema(role="producer", fields=[_field("id", "string")])
-        consumer_schema = _schema(role="consumer", fields=[_field("id", "string")])
+        producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
+        consumer_schema = create_schema(role="consumer", fields=[create_field("id", "string")])
 
         result = validate_local_contracts(
             store=_store(consumer_schema),
@@ -251,8 +232,8 @@ class TestValidateLocalContracts:
         }
 
     def test_returns_failed_when_critical_severity_rule_found(self) -> None:
-        producer_schema = _schema(role="producer", fields=[_field("id", "string")])
-        consumer_schema = _schema(role="consumer", fields=[_field("id", "integer")])
+        producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
+        consumer_schema = create_schema(role="consumer", fields=[create_field("id", "integer")])
 
         result = validate_local_contracts(
             store=_store(consumer_schema),
@@ -291,7 +272,7 @@ class TestValidateLocalContracts:
         }
 
     def test_returns_passed_when_warning_severity_rule_found(self) -> None:
-        producer_schema = _schema(role="producer", topic="orders")
+        producer_schema = create_schema(role="producer", topic="orders")
 
         result = validate_local_contracts(
             store=_store(),
@@ -331,7 +312,7 @@ class TestValidateLocalContracts:
     def test_topic_filter_skips_unmatched_topics(self) -> None:
         result = validate_local_contracts(
             store=_store(),
-            parser=_parser(_schema(topic="payments")),
+            parser=_parser(create_schema(topic="payments")),
             loader=lambda: [_MarshmallowClass],
             config=_config(),
             topics=["orders"],
@@ -348,7 +329,7 @@ class TestValidateLocalContracts:
         with caplog.at_level("WARNING", logger="contract_sentinel.services.validate"):
             validate_local_contracts(
                 store=_store(),
-                parser=_parser(_schema()),
+                parser=_parser(create_schema()),
                 loader=lambda: [],
                 config=_config(),
                 topics=["orders"],
@@ -363,8 +344,8 @@ class TestValidateLocalContracts:
         ]
 
     def test_produces_separate_report_per_topic(self) -> None:
-        s1 = _schema(topic="orders", role="producer")
-        s2 = _schema(topic="payments", role="producer")
+        s1 = create_schema(topic="orders", role="producer")
+        s2 = create_schema(topic="payments", role="producer")
 
         result = validate_local_contracts(
             store=_store(),
@@ -425,11 +406,11 @@ class TestValidateLocalContracts:
         }
 
     def test_validates_against_counterpart_when_topic_contains_slashes(self) -> None:
-        producer_schema = _schema(
-            topic="orders/created", role="producer", fields=[_field("id", "string")]
+        producer_schema = create_schema(
+            topic="orders/created", role="producer", fields=[create_field("id", "string")]
         )
-        consumer_schema = _schema(
-            topic="orders/created", role="consumer", fields=[_field("id", "string")]
+        consumer_schema = create_schema(
+            topic="orders/created", role="consumer", fields=[create_field("id", "string")]
         )
 
         result = validate_local_contracts(
@@ -457,12 +438,16 @@ class TestValidateLocalContracts:
         }
 
     def test_global_status_is_failed_when_any_group_fails(self) -> None:
-        ok_producer = _schema(topic="orders", fields=[_field("id", "string")])
-        ok_consumer = _schema(topic="orders", role="consumer", fields=[_field("id", "string")])
+        ok_producer = create_schema(topic="orders", fields=[create_field("id", "string")])
+        ok_consumer = create_schema(
+            topic="orders", role="consumer", fields=[create_field("id", "string")]
+        )
         ok_consumer.repository = "ok-repo"
 
-        bad_producer = _schema(topic="payments", fields=[_field("id", "string")])
-        bad_consumer = _schema(topic="payments", role="consumer", fields=[_field("id", "integer")])
+        bad_producer = create_schema(topic="payments", fields=[create_field("id", "string")])
+        bad_consumer = create_schema(
+            topic="payments", role="consumer", fields=[create_field("id", "integer")]
+        )
         bad_consumer.repository = "bad-repo"
 
         result = validate_local_contracts(
@@ -520,8 +505,8 @@ class TestValidatePublishedContracts:
         assert result.to_dict() == {"status": "PASSED", "reports": []}
 
     def test_returns_passed_for_compatible_pair(self) -> None:
-        producer_schema = _schema(role="producer", fields=[_field("id", "string")])
-        consumer_schema = _schema(role="consumer", fields=[_field("id", "string")])
+        producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
+        consumer_schema = create_schema(role="consumer", fields=[create_field("id", "string")])
 
         result = validate_published_contracts(store=_store(producer_schema, consumer_schema))
 
@@ -543,8 +528,8 @@ class TestValidatePublishedContracts:
         }
 
     def test_returns_failed_when_critical_severity_found(self) -> None:
-        producer_schema = _schema(role="producer", fields=[_field("id", "string")])
-        consumer_schema = _schema(role="consumer", fields=[_field("id", "integer")])
+        producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
+        consumer_schema = create_schema(role="consumer", fields=[create_field("id", "integer")])
 
         result = validate_published_contracts(store=_store(producer_schema, consumer_schema))
 
@@ -578,7 +563,7 @@ class TestValidatePublishedContracts:
         }
 
     def test_returns_passed_warning_severity_found(self) -> None:
-        producer_schema = _schema(role="producer", topic="orders")
+        producer_schema = create_schema(role="producer", topic="orders")
 
         result = validate_published_contracts(store=_store(producer_schema))
 
@@ -612,8 +597,8 @@ class TestValidatePublishedContracts:
 
     def test_topic_filter_skips_unmatched_topics(self) -> None:
         store = _store(
-            _schema(topic="payments", role="producer"),
-            _schema(topic="payments", role="consumer"),
+            create_schema(topic="payments", role="producer"),
+            create_schema(topic="payments", role="consumer"),
         )
 
         result = validate_published_contracts(store=store, topics=["orders"])
@@ -639,10 +624,10 @@ class TestValidatePublishedContracts:
 
     def test_produces_separate_report_per_topic(self) -> None:
         store = _store(
-            _schema(topic="orders", role="producer"),
-            _schema(topic="orders", role="consumer"),
-            _schema(topic="payments", role="producer"),
-            _schema(topic="payments", role="consumer"),
+            create_schema(topic="orders", role="producer"),
+            create_schema(topic="orders", role="consumer"),
+            create_schema(topic="payments", role="producer"),
+            create_schema(topic="payments", role="consumer"),
         )
 
         result = validate_published_contracts(store=store)
@@ -676,13 +661,13 @@ class TestValidatePublishedContracts:
         }
 
     def test_global_status_is_failed_when_any_group_fails(self) -> None:
-        ok_fields = [_field("id", "string")]
-        bad_fields = [_field("id", "integer")]
+        ok_fields = [create_field("id", "string")]
+        bad_fields = [create_field("id", "integer")]
         store = _store(
-            _schema(topic="orders", role="producer", fields=ok_fields),
-            _schema(topic="orders", role="consumer", fields=ok_fields),
-            _schema(topic="payments", role="producer", fields=ok_fields),
-            _schema(topic="payments", role="consumer", fields=bad_fields),
+            create_schema(topic="orders", role="producer", fields=ok_fields),
+            create_schema(topic="orders", role="consumer", fields=ok_fields),
+            create_schema(topic="payments", role="producer", fields=ok_fields),
+            create_schema(topic="payments", role="consumer", fields=bad_fields),
         )
 
         result = validate_published_contracts(store=store)
@@ -728,8 +713,8 @@ class TestValidatePublishedContracts:
         }
 
     def test_topic_filter_works_when_topic_contains_slashes(self) -> None:
-        matching = _schema(topic="orders/created", role="producer")
-        excluded = _schema(topic="payments", role="producer")
+        matching = create_schema(topic="orders/created", role="producer")
+        excluded = create_schema(topic="payments", role="producer")
 
         result = validate_published_contracts(
             store=_store(matching, excluded),
@@ -766,11 +751,11 @@ class TestValidatePublishedContracts:
         }
 
     def test_validates_pair_when_topic_contains_slashes(self) -> None:
-        producer_schema = _schema(
-            topic="orders/created", role="producer", fields=[_field("id", "string")]
+        producer_schema = create_schema(
+            topic="orders/created", role="producer", fields=[create_field("id", "string")]
         )
-        consumer_schema = _schema(
-            topic="orders/created", role="consumer", fields=[_field("id", "string")]
+        consumer_schema = create_schema(
+            topic="orders/created", role="consumer", fields=[create_field("id", "string")]
         )
 
         result = validate_published_contracts(store=_store(producer_schema, consumer_schema))

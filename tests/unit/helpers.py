@@ -1,11 +1,11 @@
-"""Shared test helpers for rules test modules."""
+"""Shared test helpers for unit test modules."""
 
 from __future__ import annotations
 
-from contract_sentinel.domain.schema import ContractField, UnknownFieldBehaviour
+from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 
 
-def field(
+def create_field(
     name: str = "field",
     type: str = "string",
     *,
@@ -27,4 +27,23 @@ def field(
         fields=fields,
         unknown=unknown,
         metadata=metadata,
+    )
+
+
+def create_schema(
+    fields: list[ContractField] | None = None,
+    *,
+    topic: str = "orders",
+    role: str = "producer",
+    repository: str = "test-repo",
+    class_name: str = "OrderSchema",
+    unknown: UnknownFieldBehaviour = UnknownFieldBehaviour.FORBID,
+) -> ContractSchema:
+    return ContractSchema(
+        topic=topic,
+        role=role,
+        repository=repository,
+        class_name=class_name,
+        unknown=unknown,
+        fields=fields or [],
     )

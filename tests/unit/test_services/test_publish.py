@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, call, create_autospec
 
 import marshmallow
 
 from contract_sentinel.adapters.contract_store import ContractStore
 from contract_sentinel.adapters.schema_parser import SchemaParser
-from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 from contract_sentinel.services.publish import (
     FailedOperation,
     OperationKind,
     PublishReport,
     publish_contracts,
 )
+from tests.unit.helpers import create_field, create_schema
+
+if TYPE_CHECKING:
+    from contract_sentinel.domain.schema import ContractSchema
 
 
 class _MarshmallowClass(marshmallow.Schema):
@@ -22,28 +26,6 @@ class _MarshmallowClass(marshmallow.Schema):
 
 class _OtherMarshmallowClass(marshmallow.Schema):
     """Another minimal class."""
-
-
-def _field(name: str = "id", type_: str = "string") -> ContractField:
-    return ContractField(name=name, type=type_, is_required=True, is_nullable=False)
-
-
-def _schema(
-    *,
-    topic: str = "orders",
-    role: str = "producer",
-    repository: str = "test-repo",
-    class_name: str = "OrderSchema",
-    fields: list[ContractField] | None = None,
-) -> ContractSchema:
-    return ContractSchema(
-        topic=topic,
-        role=role,
-        repository=repository,
-        class_name=class_name,
-        unknown=UnknownFieldBehaviour.FORBID,
-        fields=fields or [],
-    )
 
 
 def _canonical(schema: ContractSchema) -> str:
@@ -152,7 +134,7 @@ class TestPublishReportToDict:
 
         assert report.to_dict()["pruned"] == ["orders/producer/svc/OldSchema.json"]
 
-    def test_serialises_failures_with_operation_field(self) -> None:
+    def test_serialises_failures_with_operationcreate_field(self) -> None:
         report = PublishReport(
             published=[],
             updated=[],
@@ -194,7 +176,7 @@ class TestPublishContracts:
 
         result = publish_contracts(
             store=store,
-            parser=_parser(_schema()),
+            parser=_parser(create_schema()),
             loader=lambda: [],
             config=_config(),
         )
@@ -203,7 +185,7 @@ class TestPublishContracts:
         store.put_file.assert_not_called()
 
     def test_publishes_new_contract_when_key_does_not_exist(self) -> None:
-        schema = _schema()
+        schema = create_schema()
         store = _store(exists=False)
 
         result = publish_contracts(
@@ -227,7 +209,7 @@ class TestPublishContracts:
 
         publish_contracts(
             store=store,
-            parser=_parser(_schema()),
+            parser=_parser(create_schema()),
             loader=lambda: [_MarshmallowClass],
             config=_config(),
         )
@@ -235,7 +217,7 @@ class TestPublishContracts:
         store.get_file.assert_not_called()
 
     def test_marks_contract_as_unchanged_when_hash_matches(self) -> None:
-        schema = _schema()
+        schema = create_schema()
         store = _store(exists=True, stored_schema=schema)
 
         result = publish_contracts(
@@ -255,8 +237,8 @@ class TestPublishContracts:
         store.put_file.assert_not_called()
 
     def test_updates_contract_when_content_hash_has_changed(self) -> None:
-        current_schema = _schema(fields=[_field("id", "string")])
-        stored_schema = _schema(fields=[_field("id", "integer")])
+        current_schema = create_schema(fields=[create_field("id", "string")])
+        stored_schema = create_schema(fields=[create_field("id", "integer")])
         store = _store(exists=True, stored_schema=stored_schema)
 
         result = publish_contracts(
@@ -278,8 +260,8 @@ class TestPublishContracts:
         )
 
     def test_counts_are_independent_across_multiple_schemas(self) -> None:
-        new_schema = _schema(topic="orders")
-        unchanged_schema = _schema(topic="payments")
+        new_schema = create_schema(topic="orders")
+        unchanged_schema = create_schema(topic="payments")
 
         store = create_autospec(ContractStore)
         store.file_exists.side_effect = lambda key: "payments" in key
@@ -301,9 +283,9 @@ class TestPublishContracts:
             "failed": [],
         }
 
-    def test_put_file_called_for_each_written_schema(self) -> None:
-        s1 = _schema(topic="orders")
-        s2 = _schema(topic="payments")
+    def test_put_file_called_for_each_writtencreate_schema(self) -> None:
+        s1 = create_schema(topic="orders")
+        s2 = create_schema(topic="payments")
 
         store = _store(exists=False)
 
@@ -323,7 +305,7 @@ class TestPublishContracts:
         )
 
     def test_parser_receives_detected_framework_and_config_name(self) -> None:
-        schema = _schema()
+        schema = create_schema()
         parser = _parser(schema)
 
         publish_contracts(
@@ -338,7 +320,7 @@ class TestPublishContracts:
         assert repo_name == "my-service"
 
     def test_write_phase_failure_stored_with_s3_key_and_publish_operation(self) -> None:
-        schema = _schema()
+        schema = create_schema()
         store = _store(exists=False, put_file_error=RuntimeError("S3 unavailable"))
 
         result = publish_contracts(
@@ -385,7 +367,7 @@ class TestPublishContracts:
 
     def test_parse_failure_aborts_write_phase(self) -> None:
         store = _store()
-        good_schema = _schema(topic="orders")
+        good_schema = create_schema(topic="orders")
 
         result = publish_contracts(
             store=store,
@@ -428,8 +410,8 @@ class TestPublishContracts:
         store.put_file.assert_not_called()
 
     def test_write_phase_continues_after_s3_error(self) -> None:
-        failing_schema = _schema(topic="orders")
-        good_schema = _schema(topic="payments")
+        failing_schema = create_schema(topic="orders")
+        good_schema = create_schema(topic="payments")
 
         def _put_side_effect(key: str, _content: str) -> None:
             if "orders" in key:
@@ -455,8 +437,8 @@ class TestPublishContracts:
         }
 
     def test_removes_stale_key_for_renamed_class(self) -> None:
-        schema = _schema(class_name="OrderSchemaV2")
-        stale_key = _schema(class_name="OrderSchema").to_store_key()
+        schema = create_schema(class_name="OrderSchemaV2")
+        stale_key = create_schema(class_name="OrderSchema").to_store_key()
 
         store = _store(
             exists=False,
@@ -476,8 +458,8 @@ class TestPublishContracts:
     def test_removes_stale_key_when_topic_contains_slashes(self) -> None:
         # rsplit("/", 3) must correctly identify repository ownership even when
         # the topic itself contains slashes.
-        schema = _schema(topic="orders/created", class_name="OrderSchemaV2")
-        stale_key = _schema(topic="orders/created", class_name="OrderSchema").to_store_key()
+        schema = create_schema(topic="orders/created", class_name="OrderSchemaV2")
+        stale_key = create_schema(topic="orders/created", class_name="OrderSchema").to_store_key()
 
         store = _store(
             exists=False,
@@ -495,8 +477,8 @@ class TestPublishContracts:
         store.delete_file.assert_called_once_with(stale_key)
 
     def test_does_not_prune_keys_owned_by_other_repositories(self) -> None:
-        schema = _schema()
-        other_repo_key = _schema(repository="other-repo").to_store_key()
+        schema = create_schema()
+        other_repo_key = create_schema(repository="other-repo").to_store_key()
 
         store = _store(
             exists=False,
@@ -514,8 +496,8 @@ class TestPublishContracts:
         store.delete_file.assert_not_called()
 
     def test_prune_phase_is_skipped_when_write_phase_has_failures(self) -> None:
-        schema = _schema()
-        stale_key = _schema(class_name="OldOrderSchema").to_store_key()
+        schema = create_schema()
+        stale_key = create_schema(class_name="OldOrderSchema").to_store_key()
 
         store = _store(
             exists=False,
@@ -534,8 +516,8 @@ class TestPublishContracts:
         store.delete_file.assert_not_called()
 
     def test_prune_failure_appears_in_failed_list_with_prune_operation(self) -> None:
-        schema = _schema(class_name="OrderSchemaV2")
-        stale_key = _schema(class_name="OrderSchema").to_store_key()
+        schema = create_schema(class_name="OrderSchemaV2")
+        stale_key = create_schema(class_name="OrderSchema").to_store_key()
 
         store = _store(
             exists=False,
@@ -557,7 +539,7 @@ class TestPublishContracts:
         assert result.failed[0].reason == "permission denied"
 
     def test_prune_phase_is_skipped_when_parse_phase_has_failures(self) -> None:
-        stale_key = _schema(class_name="OldOrderSchema").to_store_key()
+        stale_key = create_schema(class_name="OldOrderSchema").to_store_key()
         store = _store(store_keys=[stale_key])
 
         result = publish_contracts(

@@ -1,11 +1,11 @@
 from contract_sentinel.domain.rules import DirectionMismatchRule
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field
 
 
 class TestDirectionMismatchRule:
     def test_returns_violation_when_producer_load_only_consumer_not_dump_only(self) -> None:
-        producer = field(is_load_only=True)
-        consumer = field(is_dump_only=False)
+        producer = create_field(is_load_only=True)
+        consumer = create_field(is_dump_only=False)
 
         violations = DirectionMismatchRule().check(producer, consumer)
 
@@ -25,32 +25,32 @@ class TestDirectionMismatchRule:
 
     def test_returns_empty_when_producer_load_only_and_consumer_also_dump_only(self) -> None:
         # Consumer only sends this field (dump_only) — it has no expectation of receiving it.
-        producer = field(is_load_only=True)
-        consumer = field(is_dump_only=True)
+        producer = create_field(is_load_only=True)
+        consumer = create_field(is_dump_only=True)
 
         assert DirectionMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_producer_is_not_load_only(self) -> None:
-        producer = field(is_load_only=False)
-        consumer = field()
+        producer = create_field(is_load_only=False)
+        consumer = create_field()
 
         assert DirectionMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_producer_is_dump_only(self) -> None:
         # dump_only producer always includes the field in its output — no conflict.
-        producer = field(is_dump_only=True)
-        consumer = field()
+        producer = create_field(is_dump_only=True)
+        consumer = create_field()
 
         assert DirectionMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_both_fields_are_regular(self) -> None:
-        producer = field()
-        consumer = field()
+        producer = create_field()
+        consumer = create_field()
 
         assert DirectionMismatchRule().check(producer, consumer) == []
 
     def test_returns_empty_when_producer_is_none(self) -> None:
-        assert DirectionMismatchRule().check(None, field()) == []
+        assert DirectionMismatchRule().check(None, create_field()) == []
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
-        assert DirectionMismatchRule().check(field(), None) == []
+        assert DirectionMismatchRule().check(create_field(), None) == []

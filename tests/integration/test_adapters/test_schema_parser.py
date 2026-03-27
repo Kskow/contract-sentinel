@@ -17,10 +17,6 @@ class _Color(enum.Enum):
 
 
 class TestMarshmallow3Parser:
-    # -------------------------------------------------------------------------
-    # 1. Unknown field behaviour
-    # -------------------------------------------------------------------------
-
     @pytest.mark.parametrize(
         ("ma_unknown", "expected"),
         [
@@ -118,10 +114,6 @@ class TestMarshmallow3Parser:
 
         assert field["name"] == "orderId"
 
-    # -------------------------------------------------------------------------
-    # 3. Defaults
-    # -------------------------------------------------------------------------
-
     def test_load_default_appears_in_metadata(self) -> None:
         @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
@@ -141,10 +133,6 @@ class TestMarshmallow3Parser:
         field = result.to_dict()["fields"][0]
 
         assert field["metadata"]["dump_default"] == "test_value"
-
-    # -------------------------------------------------------------------------
-    # 4. Fields mapping
-    # -------------------------------------------------------------------------
 
     def test_simple_fields_without_format(self) -> None:
         @contract(topic="t", role=Role.PRODUCER)
@@ -235,7 +223,6 @@ class TestMarshmallow3Parser:
             f_ipinterface = ma.fields.IPInterface()
             f_enum = ma.fields.Enum(_Color)
 
-        # shared base for all string fields
         _s = {"is_required": False, "is_nullable": False, "is_supported": True}
         assert Marshmallow3Parser(repository="svc").parse(FormattedSchema).to_dict() == {
             "topic": "t",
@@ -719,10 +706,6 @@ class TestMarshmallow3Parser:
                 }
             ],
         }
-
-    # -------------------------------------------------------------------------
-    # 5. Validators
-    # -------------------------------------------------------------------------
 
     def test_length_validator_with_min_and_max_appears_in_metadata(self) -> None:
         @contract(topic="t", role=Role.PRODUCER)

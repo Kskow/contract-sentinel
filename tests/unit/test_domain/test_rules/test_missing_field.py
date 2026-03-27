@@ -1,10 +1,10 @@
 from contract_sentinel.domain.rules import MissingFieldRule
-from contract_sentinel.domain.schema import ContractField
+from tests.unit.helpers import create_field
 
 
 class TestMissingFieldRule:
     def test_returns_violation_when_producer_field_absent_and_consumer_required(self) -> None:
-        consumer = ContractField(name="field", type="string", is_required=True, is_nullable=False)
+        consumer = create_field()
 
         violations = MissingFieldRule().check(None, consumer)
 
@@ -19,24 +19,15 @@ class TestMissingFieldRule:
         }
 
     def test_returns_empty_when_consumer_has_default(self) -> None:
-        consumer = ContractField(
-            name="field",
-            type="string",
-            is_required=True,
-            is_nullable=False,
-            metadata={"load_default": "fallback"},
-        )
+        consumer = create_field(metadata={"load_default": "fallback"})
 
         assert MissingFieldRule().check(None, consumer) == []
 
     def test_returns_empty_when_consumer_is_not_required(self) -> None:
-        consumer = ContractField(name="field", type="string", is_required=False, is_nullable=False)
+        consumer = create_field(is_required=False)
 
         assert MissingFieldRule().check(None, consumer) == []
 
     def test_returns_empty_when_producer_is_present(self) -> None:
         # Both sides present — not a missing-field scenario.
-        producer = ContractField(name="field", type="string", is_required=True, is_nullable=False)
-        consumer = ContractField(name="field", type="string", is_required=True, is_nullable=False)
-
-        assert MissingFieldRule().check(producer, consumer) == []
+        assert MissingFieldRule().check(create_field(), create_field()) == []

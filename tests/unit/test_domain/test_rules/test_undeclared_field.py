@@ -1,11 +1,11 @@
 from contract_sentinel.domain.rules import UndeclaredFieldRule
 from contract_sentinel.domain.schema import UnknownFieldBehaviour
-from tests.unit.test_domain.test_rules.helpers import field
+from tests.unit.helpers import create_field
 
 
 class TestUndeclaredFieldRule:
     def test_returns_violation_when_consumer_forbids_unknowns(self) -> None:
-        producer_field = field(name="extra", type="string")
+        producer_field = create_field(name="extra", type="string")
 
         violations = UndeclaredFieldRule().check(producer_field, UnknownFieldBehaviour.FORBID)
 
@@ -23,12 +23,12 @@ class TestUndeclaredFieldRule:
         }
 
     def test_returns_empty_when_consumer_ignores_unknowns(self) -> None:
-        producer_field = field(name="extra", type="string")
+        producer_field = create_field(name="extra", type="string")
 
         assert UndeclaredFieldRule().check(producer_field, UnknownFieldBehaviour.IGNORE) == []
 
     def test_returns_empty_when_consumer_allows_unknowns(self) -> None:
-        producer_field = field(name="extra", type="string")
+        producer_field = create_field(name="extra", type="string")
 
         assert UndeclaredFieldRule().check(producer_field, UnknownFieldBehaviour.ALLOW) == []
 
@@ -36,6 +36,6 @@ class TestUndeclaredFieldRule:
         assert UndeclaredFieldRule().check(None, UnknownFieldBehaviour.FORBID) == []
 
     def test_returns_empty_when_unknown_is_none(self) -> None:
-        producer_field = field(name="extra", type="string")
+        producer_field = create_field(name="extra", type="string")
 
         assert UndeclaredFieldRule().check(producer_field, None) == []
