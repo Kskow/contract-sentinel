@@ -390,15 +390,9 @@ class TestValidateLocal:
             "\n"
             "         Fix on their side (Producer) — copy & paste to your agent:\n"
             "\n"
-            "           In `OrderProducerSchema`, make the following changes"
-            " to satisfy the contract with test-repo/OrderConsumerSchema:\n"
-            "\n"
             "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
             "\n"
             "         Fix on your side (Consumer) — copy & paste to your agent:\n"
-            "\n"
-            "           In `OrderConsumerSchema`, make the following changes"
-            " to satisfy the contract with orders-service/OrderProducerSchema:\n"
             "\n"
             "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
             "\n"
@@ -477,6 +471,43 @@ class TestValidatePublished:
             "\n"
         )
 
+    def test_how_to_fix_prints_fix_suggestions_with_generic_labels(
+        self,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer(field_type="string"), _consumer())
+
+        result = CliRunner().invoke(
+            app, ["validate-published-contracts", "--how-to-fix"], env=cli_env
+        )
+
+        assert result.exit_code == 1
+        assert result.output == (
+            "\nContract Validation — FAILED\n"
+            "\n"
+            "  ✗  orders\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+            "\nFix Suggestions\n"
+            "\n"
+            "  orders\n"
+            "\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "\n"
+            "         Fix on Producer side — copy & paste to your agent:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on Consumer side — copy & paste to your agent:\n"
+            "\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+        )
+
 
 class TestPrintFixSuggestionsReport:
     def test_no_op_when_no_suggestions(self) -> None:
@@ -492,16 +523,8 @@ class TestPrintFixSuggestionsReport:
         pair = PairFixSuggestion(
             producer_id="my-service/OrderProducerSchema",
             consumer_id="other-service/OrderConsumerSchema",
-            producer_suggestions=(
-                "In `OrderProducerSchema`, make the following changes"
-                " to satisfy the contract with other-service/OrderConsumerSchema:\n\n"
-                "1. Change the type of field 'id' from 'string' to 'integer'."
-            ),
-            consumer_suggestions=(
-                "In `OrderConsumerSchema`, make the following changes"
-                " to satisfy the contract with my-service/OrderProducerSchema:\n\n"
-                "1. Change the type of field 'id' from 'integer' to 'string'."
-            ),
+            producer_suggestions="1. Change the type of field 'id' from 'string' to 'integer'.",
+            consumer_suggestions="1. Change the type of field 'id' from 'integer' to 'string'.",
         )
         report = FixSuggestionsReport(
             suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
@@ -520,15 +543,9 @@ class TestPrintFixSuggestionsReport:
             "\n"
             "         Fix on your side (Producer) — copy & paste to your agent:\n"
             "\n"
-            "           In `OrderProducerSchema`, make the following changes"
-            " to satisfy the contract with other-service/OrderConsumerSchema:\n"
-            "\n"
             "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
             "\n"
             "         Fix on their side (Consumer) — copy & paste to your agent:\n"
-            "\n"
-            "           In `OrderConsumerSchema`, make the following changes"
-            " to satisfy the contract with my-service/OrderProducerSchema:\n"
             "\n"
             "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
             "\n"
@@ -539,16 +556,8 @@ class TestPrintFixSuggestionsReport:
         pair = PairFixSuggestion(
             producer_id="other-service/OrderProducerSchema",
             consumer_id="my-service/OrderConsumerSchema",
-            producer_suggestions=(
-                "In `OrderProducerSchema`, make the following changes"
-                " to satisfy the contract with my-service/OrderConsumerSchema:\n\n"
-                "1. Change the type of field 'id' from 'string' to 'integer'."
-            ),
-            consumer_suggestions=(
-                "In `OrderConsumerSchema`, make the following changes"
-                " to satisfy the contract with other-service/OrderProducerSchema:\n\n"
-                "1. Change the type of field 'id' from 'integer' to 'string'."
-            ),
+            producer_suggestions="1. Change the type of field 'id' from 'string' to 'integer'.",
+            consumer_suggestions="1. Change the type of field 'id' from 'integer' to 'string'.",
         )
         report = FixSuggestionsReport(
             suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
@@ -567,15 +576,9 @@ class TestPrintFixSuggestionsReport:
             "\n"
             "         Fix on their side (Producer) — copy & paste to your agent:\n"
             "\n"
-            "           In `OrderProducerSchema`, make the following changes"
-            " to satisfy the contract with my-service/OrderConsumerSchema:\n"
-            "\n"
             "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
             "\n"
             "         Fix on your side (Consumer) — copy & paste to your agent:\n"
-            "\n"
-            "           In `OrderConsumerSchema`, make the following changes"
-            " to satisfy the contract with other-service/OrderProducerSchema:\n"
             "\n"
             "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
             "\n"
@@ -586,16 +589,8 @@ class TestPrintFixSuggestionsReport:
         pair = PairFixSuggestion(
             producer_id="svc-a/OrderProducerSchema",
             consumer_id="svc-b/OrderConsumerSchema",
-            producer_suggestions=(
-                "In `OrderProducerSchema`, make the following changes"
-                " to satisfy the contract with svc-b/OrderConsumerSchema:\n\n"
-                "1. Change the type of field 'id' from 'string' to 'integer'."
-            ),
-            consumer_suggestions=(
-                "In `OrderConsumerSchema`, make the following changes"
-                " to satisfy the contract with svc-a/OrderProducerSchema:\n\n"
-                "1. Change the type of field 'id' from 'integer' to 'string'."
-            ),
+            producer_suggestions="1. Change the type of field 'id' from 'string' to 'integer'.",
+            consumer_suggestions="1. Change the type of field 'id' from 'integer' to 'string'.",
         )
         report = FixSuggestionsReport(
             suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
@@ -614,15 +609,9 @@ class TestPrintFixSuggestionsReport:
             "\n"
             "         Fix on Producer side — copy & paste to your agent:\n"
             "\n"
-            "           In `OrderProducerSchema`, make the following changes"
-            " to satisfy the contract with svc-b/OrderConsumerSchema:\n"
-            "\n"
             "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
             "\n"
             "         Fix on Consumer side — copy & paste to your agent:\n"
-            "\n"
-            "           In `OrderConsumerSchema`, make the following changes"
-            " to satisfy the contract with svc-a/OrderProducerSchema:\n"
             "\n"
             "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
             "\n"
@@ -634,14 +623,10 @@ class TestPrintFixSuggestionsReport:
             producer_id="svc-a/OrderProducerSchema",
             consumer_id="svc-b/OrderConsumerSchema",
             producer_suggestions=(
-                "In `OrderProducerSchema`, make the following changes"
-                " to satisfy the contract with svc-b/OrderConsumerSchema:\n\n"
                 "1. Change the type of field 'id' from 'string' to 'integer'.\n"
                 "2. Remove the nullable constraint from field 'name'."
             ),
             consumer_suggestions=(
-                "In `OrderConsumerSchema`, make the following changes"
-                " to satisfy the contract with svc-a/OrderProducerSchema:\n\n"
                 "1. Change the type of field 'id' from 'integer' to 'string'.\n"
                 "2. Mark field 'name' as nullable."
             ),
@@ -663,16 +648,10 @@ class TestPrintFixSuggestionsReport:
             "\n"
             "         Fix on Producer side — copy & paste to your agent:\n"
             "\n"
-            "           In `OrderProducerSchema`, make the following changes"
-            " to satisfy the contract with svc-b/OrderConsumerSchema:\n"
-            "\n"
             "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
             "           2. Remove the nullable constraint from field 'name'.\n"
             "\n"
             "         Fix on Consumer side — copy & paste to your agent:\n"
-            "\n"
-            "           In `OrderConsumerSchema`, make the following changes"
-            " to satisfy the contract with svc-a/OrderProducerSchema:\n"
             "\n"
             "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
             "           2. Mark field 'name' as nullable.\n"

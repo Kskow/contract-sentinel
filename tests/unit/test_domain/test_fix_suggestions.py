@@ -60,14 +60,8 @@ class TestBuildContractsFixReport:
                         PairFixSuggestion(
                             producer_id="svc-a/PaymentSchema",
                             consumer_id="svc-b/PaymentConsumer",
-                            producer_suggestions=(
-                                "In `PaymentSchema`, make the following changes to satisfy"
-                                " the contract with svc-b/PaymentConsumer:\n\n"
-                                "1. Add 'amount' as a required field."
-                            ),
+                            producer_suggestions="1. Add 'amount' as a required field.",
                             consumer_suggestions=(
-                                "In `PaymentConsumer`, make the following changes to satisfy"
-                                " the contract with svc-a/PaymentSchema:\n\n"
                                 "1. Add a 'load_default' to field 'amount',"
                                 " or mark it as not required."
                             ),
@@ -100,14 +94,8 @@ class TestBuildContractsFixReport:
                         PairFixSuggestion(
                             producer_id="svc-a/OrderSchema",
                             consumer_id="svc-c/OrderConsumer",
-                            producer_suggestions=(
-                                "In `OrderSchema`, make the following changes to satisfy"
-                                " the contract with svc-c/OrderConsumer:\n\n"
-                                "1. Add 'amount' as a required field."
-                            ),
+                            producer_suggestions="1. Add 'amount' as a required field.",
                             consumer_suggestions=(
-                                "In `OrderConsumer`, make the following changes to satisfy"
-                                " the contract with svc-a/OrderSchema:\n\n"
                                 "1. Add a 'load_default' to field 'amount',"
                                 " or mark it as not required."
                             ),
@@ -136,14 +124,8 @@ class TestSuggestFixes:
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
-            producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
-                "1. Add 'required_field' as a required field."
-            ),
+            producer_suggestions="1. Add 'required_field' as a required field.",
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Add a 'load_default' to field 'required_field', or mark it as not required."
             ),
         )
@@ -162,14 +144,10 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Change the type of field 'field_name' from 'String' to 'Integer'.\n"
                 "2. Add 'other_field' as a required field."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Change the type of field 'field_name' from 'Integer' to 'String'.\n"
                 "2. Add a 'load_default' to field 'other_field', or mark it as not required."
             ),
@@ -188,13 +166,9 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Change the type of field 'field_name' from 'String' to 'Integer'."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Change the type of field 'field_name' from 'Integer' to 'String'."
             ),
         )
@@ -205,14 +179,8 @@ class TestSuggestFixes:
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
-            producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
-                "1. Add 'email' as a required field."
-            ),
+            producer_suggestions="1. Add 'email' as a required field.",
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Add a 'load_default' to field 'email', or mark it as not required."
             ),
         )
@@ -223,14 +191,8 @@ class TestSuggestFixes:
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
-            producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
-                "1. Mark field 'status' as required."
-            ),
+            producer_suggestions="1. Mark field 'status' as required.",
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Add a 'load_default' to field 'status', or mark it as not required."
             ),
         )
@@ -241,16 +203,8 @@ class TestSuggestFixes:
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
-            producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
-                "1. Remove the nullable constraint from field 'age'."
-            ),
-            consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
-                "1. Mark field 'age' as nullable."
-            ),
+            producer_suggestions="1. Remove the nullable constraint from field 'age'.",
+            consumer_suggestions="1. Mark field 'age' as nullable.",
         )
 
     def test_direction_mismatch_instructions(self) -> None:
@@ -260,14 +214,10 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Ensure field 'token' is included in serialised output"
                 " (remove any output-exclusion flag)."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Mark field 'token' as input-only,"
                 " or remove the expectation of receiving it from the producer."
             ),
@@ -280,13 +230,9 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Replace the open map for field 'metadata' with a fixed-schema nested object."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Replace the fixed-schema nested object for field 'metadata' with an open map."
             ),
         )
@@ -298,14 +244,10 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Remove field 'extra_field' from your schema,"
                 " or rename it to match a field declared in the consumer."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Declare field 'extra_field' in your schema,"
                 " or change the unknown field policy from 'forbid' to 'ignore' or 'allow'."
             ),
@@ -329,14 +271,10 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Add an allowed-values constraint to field 'category'"
                 " whose values are a subset of ['A', 'B']."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Expand the allowed values for field 'category' to include None."
             ),
         )
@@ -359,13 +297,9 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Restrict the allowed values for field 'category' to ['A', 'B']."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Expand the allowed values for field 'category' to include ['A', 'B', 'C']."
             ),
         )
@@ -386,13 +320,9 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Tighten the range constraint on field 'score' to match the consumer: (0, 100)."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Widen the range constraint on field 'score'"
                 " to accept the producer's range: (0, 1000)."
             ),
@@ -414,14 +344,10 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Tighten the length constraint on field 'username'"
                 " to match the consumer: (0, 50)."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Widen the length constraint on field 'username'"
                 " to accept the producer's length: (0, 500)."
             ),
@@ -443,13 +369,9 @@ class TestSuggestFixes:
             producer_id="repo-a/ProducerSchema",
             consumer_id="repo-b/ConsumerSchema",
             producer_suggestions=(
-                "In `ProducerSchema`, make the following changes to satisfy the contract"
-                " with repo-b/ConsumerSchema:\n\n"
                 "1. Change metadata 'format' on field 'created_at' to 'timestamp'."
             ),
             consumer_suggestions=(
-                "In `ConsumerSchema`, make the following changes to satisfy the contract"
-                " with repo-a/ProducerSchema:\n\n"
                 "1. Change metadata 'format' on field 'created_at' to 'iso8601'."
             ),
         )

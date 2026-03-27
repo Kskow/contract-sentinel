@@ -76,28 +76,14 @@ def suggest_fixes(pair: PairViolations) -> PairFixSuggestion | None:
     return PairFixSuggestion(
         producer_id=pair.producer_id,
         consumer_id=pair.consumer_id,
-        producer_suggestions=_build_block(
-            pair.producer_id,
-            pair.consumer_id,
-            [i.producer_suggestion for i in instructions],
-        ),
-        consumer_suggestions=_build_block(
-            pair.consumer_id,
-            pair.producer_id,
-            [i.consumer_suggestion for i in instructions],
-        ),
+        producer_suggestions=_build_block([i.producer_suggestion for i in instructions]),
+        consumer_suggestions=_build_block([i.consumer_suggestion for i in instructions]),
     )
 
 
-def _build_block(schema_id: str, counterpart_id: str, instructions: list[str]) -> str:
+def _build_block(instructions: list[str]) -> str:
     """Assemble a numbered fix prompt block for one side of a pair."""
-    class_name = schema_id.rsplit("/", 1)[1]
-    header = (
-        f"In `{class_name}`, make the following changes to satisfy the contract"
-        f" with {counterpart_id}:"
-    )
-    numbered = "\n".join(f"{i}. {instr}" for i, instr in enumerate(instructions, 1))
-    return f"{header}\n\n{numbered}"
+    return "\n".join(f"{i}. {instr}" for i, instr in enumerate(instructions, 1))
 
 
 def _instruction_for(violation: Violation) -> FixSuggestion | None:

@@ -76,6 +76,10 @@ def validate_published_contracts(
         bool,
         typer.Option("--verbose", help="Show all contracts, including passed ones."),
     ] = False,
+    how_to_fix: Annotated[
+        bool,
+        typer.Option("--how-to-fix", help="Show copy-paste fix suggestions for each failing pair."),
+    ] = False,
 ) -> None:
     """Validate all published contracts against each other."""
     config = Config()
@@ -83,6 +87,10 @@ def validate_published_contracts(
     report = service_validate_published_contracts(store)
 
     print_validation_report(report, verbose=verbose)
+
+    if how_to_fix:
+        fix_suggestions_report = build_contracts_fix_report(report)
+        print_fix_suggestions_report(fix_suggestions_report, local_name=None)
 
     if not dry_run and report.status == ValidationStatus.FAILED:
         raise typer.Exit(code=1)
