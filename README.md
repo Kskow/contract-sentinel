@@ -72,7 +72,9 @@ contract_sentinel/
 │   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
 ├── adapters/           # ABC + implementation(s) per concern
 │   ├── contract_store.py   # ContractStore(ABC) + S3ContractStore
-│   └── schema_parser.py    # SchemaParser(ABC)  + Marshmallow3Parser
+│   └── schema_parsers/     # SchemaParser(ABC) + MarshmallowParser (ma3 + ma4)
+│       ├── parser.py       #   SchemaParser ABC, ResolvedFieldType, TypeMapEntry
+│       └── marshmallow.py  #   MarshmallowParser
 ├── services/           # Use-case orchestration
 │   ├── validate.py     # validate_local_contracts, validate_published_contracts
 │   └── publish.py      # publish_contracts — 3-phase (parse → write → prune), SHA-256 hash-gated
