@@ -137,56 +137,57 @@ markers = ["ma4: tests that require marshmallow 4"]
 
 ---
 
-### TICKET-02 — Restructure schema_parser adapter into `schema_parsers/` package
+### TICKET-02 — Restructure schema_parser adapter into `schema_parsers/` package ✅
 
 **Depends on:** –
 **Type:** Adapter
+**Status:** Done
 
 **Goal:**
 Split `adapters/schema_parser.py` into a proper package that hosts the ABC and marshmallow
 implementations separately. Zero logic changes — this is a pure structural refactor.
 
-**Files to create / modify:**
-- `contract_sentinel/adapters/schema_parsers/__init__.py` — create
-- `contract_sentinel/adapters/schema_parsers/schema_parser.py` — create
-- `contract_sentinel/adapters/schema_parsers/marshmallow.py` — create
-- `contract_sentinel/adapters/schema_parser.py` — delete
-- `contract_sentinel/factory.py` — modify (imports only)
-- `tests/unit/test_factory.py` — modify (import only)
-- `tests/integration/test_adapters/test_schema_parser.py` — rename to `test_schema_parser_ma3.py` + modify (import only)
+**Files created / modified:**
+- `contract_sentinel/adapters/schema_parsers/__init__.py` — created (empty package marker, no re-exports)
+- `contract_sentinel/adapters/schema_parsers/schema_parser.py` — created
+- `contract_sentinel/adapters/schema_parsers/marshmallow.py` — created
+- `contract_sentinel/adapters/schema_parser.py` — deleted
+- `contract_sentinel/factory.py` — imports updated
+- `contract_sentinel/services/publish.py` — import updated (not in original ticket scope but needed)
+- `contract_sentinel/services/validate.py` — import updated (not in original ticket scope but needed)
+- `tests/unit/test_factory.py` — import updated
+- `tests/unit/test_services/test_publish.py` — import updated (not in original ticket scope but needed)
+- `tests/unit/test_services/test_validate.py` — import updated (not in original ticket scope but needed)
+- `tests/integration/test_adapters/test_schema_parser_ma3.py` — renamed + import updated
 
-**Content split:**
+**Content split (deviations from ticket noted):**
 
 `schema_parsers/schema_parser.py` receives:
-- `SchemaParser(ABC)` verbatim. No marshmallow imports.
+- `SchemaParser(ABC)`
+- `ResolvedFieldType` NamedTuple — kept here (not in `marshmallow.py`) so future parsers can reuse it
+- `TypeMapEntry` NamedTuple — same rationale
+
+> **Deviation:** The ticket placed `ResolvedFieldType` and `TypeMapEntry` in `marshmallow.py`.
+> Moved to `schema_parser.py` so they're available to any future parser (pydantic, dataclasses)
+> without importing from the marshmallow module.
+>
+> **Deviation:** The ticket called for `_ResolvedFieldType` / `_TypeMapEntry` (private names).
+> Prefix removed — they're now public helpers intended for reuse across parser implementations.
+>
+> **Deviation:** `__init__.py` is an empty package marker. No re-exports — import the concrete
+> class you need directly from its module.
 
 `schema_parsers/marshmallow.py` receives:
-- The `TYPE_CHECKING` block with marshmallow type imports.
-- `_ResolvedFieldType` NamedTuple.
-- `_TypeMapEntry` NamedTuple.
-- `Marshmallow3Parser` verbatim.
-
-`schema_parsers/__init__.py`:
-```python
-from contract_sentinel.adapters.schema_parsers.schema_parser import SchemaParser
-from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
-
-__all__ = ["SchemaParser", "Marshmallow3Parser"]
-```
-
-**Import updates (no logic changes):**
-- `factory.py` TYPE_CHECKING: `adapters.schema_parser` → `adapters.schema_parsers.schema_parser`
-- `factory.py` runtime: `adapters.schema_parser` → `adapters.schema_parsers.marshmallow`
-- `test_factory.py`: `adapters.schema_parser` → `adapters.schema_parsers.marshmallow`
-- `test_schema_parser_ma3.py` (renamed from `test_schema_parser.py`): same path update
+- The `TYPE_CHECKING` block with marshmallow type imports
+- `Marshmallow3Parser`
 
 **Done when:**
-- [ ] `contract_sentinel/adapters/schema_parser.py` no longer exists.
-- [ ] `contract_sentinel/adapters/schema_parsers/` contains `__init__.py`, `schema_parser.py`,
+- [x] `contract_sentinel/adapters/schema_parser.py` no longer exists.
+- [x] `contract_sentinel/adapters/schema_parsers/` contains `__init__.py`, `schema_parser.py`,
   `marshmallow.py`.
-- [ ] `tests/integration/test_adapters/test_schema_parser_ma3.py` exists (renamed).
-- [ ] `uv run pytest tests/ -m "not ma4"` passes with zero failures — no logic changed.
-- [ ] `uv run ty check` passes with no new errors.
+- [x] `tests/integration/test_adapters/test_schema_parser_ma3.py` exists (renamed).
+- [x] `uv run pytest tests/ -m "not ma4"` passes with zero failures — 303 passed.
+- [x] `uv run ty check` passes with no new errors.
 
 ---
 

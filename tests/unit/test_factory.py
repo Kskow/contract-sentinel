@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from contract_sentinel.adapters.contract_store import S3ContractStore
-from contract_sentinel.adapters.schema_parser import Marshmallow3Parser
+from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
 from contract_sentinel.config import Config
 from contract_sentinel.domain.errors import (
     MissingDependencyError,

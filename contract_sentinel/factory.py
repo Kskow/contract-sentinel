@@ -11,7 +11,7 @@ from contract_sentinel.domain.framework import Framework
 
 if TYPE_CHECKING:
     from contract_sentinel.adapters.contract_store import ContractStore
-    from contract_sentinel.adapters.schema_parser import SchemaParser
+    from contract_sentinel.adapters.schema_parsers.parser import SchemaParser
     from contract_sentinel.config import Config
 
 
@@ -19,7 +19,7 @@ def get_parser(framework: Framework, repository: str) -> SchemaParser:
     """Instantiate the parser adapter for the detected schema framework."""
     match framework:
         case Framework.MARSHMALLOW:
-            from contract_sentinel.adapters.schema_parser import Marshmallow3Parser
+            from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
 
             try:
                 return Marshmallow3Parser(repository=repository)

@@ -6,7 +6,7 @@ import marshmallow as ma
 import marshmallow.validate as mv
 import pytest
 
-from contract_sentinel.adapters.schema_parser import Marshmallow3Parser
+from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
 from contract_sentinel.domain.participant import Role, contract
 
 
