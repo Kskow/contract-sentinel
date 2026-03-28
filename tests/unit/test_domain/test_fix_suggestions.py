@@ -10,10 +10,10 @@ from contract_sentinel.domain.fix_suggestions import (
 from contract_sentinel.domain.report import (
     ContractReport,
     FixSuggestionsReport,
+    PairViolations,
     TopicFixSuggestions,
     ValidationReport,
 )
-from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.rule import RuleName
 from tests.unit.helpers import create_violation
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_sentinel.domain.report import FixSuggestion
 from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import UnknownFieldBehaviour
@@ -44,3 +45,16 @@ class UndeclaredFieldRule:
                 ),
             )
         ]
+
+    def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
+        path = violation.field_path
+        return FixSuggestion(
+            producer_suggestion=(
+                f"Remove field '{path}' from your schema,"
+                " or rename it to match a field declared in the consumer."
+            ),
+            consumer_suggestion=(
+                f"Declare field '{path}' in your schema,"
+                " or change the unknown field policy from 'forbid' to 'ignore' or 'allow'."
+            ),
+        )

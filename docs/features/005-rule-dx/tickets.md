@@ -100,12 +100,12 @@ Move fix suggestion logic into the rule class that raises the violation, elimina
 - All other `tests/unit/test_domain/test_rules/test_<rule>.py` for CRITICAL rules — same: add `suggest_fix` test cases
 
 **Done when:**
-- [ ] `FixSuggestion` is defined in `report.py`; the definition is removed from `fix_suggestions.py`
-- [ ] `Rule.suggest_fix` exists with a default `return None`; all 8 CRITICAL rule classes override it
-- [ ] `RULE_REGISTRY` is defined in `engine.py` and covers all 12 `RuleName` members except `COUNTERPART_MISMATCH`
-- [ ] `fix_suggestions._instruction_for` contains no `match` block; it delegates entirely to `RULE_REGISTRY` lookup
-- [ ] Each CRITICAL rule's unit test file asserts the correct `FixSuggestion` is returned from `suggest_fix`
-- [ ] `just check` passes
+- [x] `FixSuggestion` is defined in `report.py`; the definition is removed from `fix_suggestions.py`
+- [x] `Rule.suggest_fix` exists with a default `return None`; all 8 CRITICAL rule classes override it
+- [x] `RULE_REGISTRY` is defined in `engine.py` and covers all 12 `RuleName` members except `COUNTERPART_MISMATCH`
+- [x] `fix_suggestions._instruction_for` contains no `match` block; it delegates entirely to `RULE_REGISTRY` lookup
+- [x] Each CRITICAL rule's unit test file asserts the correct `FixSuggestion` is returned from `suggest_fix`
+- [x] `just check` passes
 
 ---
 

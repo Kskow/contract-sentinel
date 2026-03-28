@@ -4,7 +4,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.participant import Role
-from contract_sentinel.domain.report import ContractReport
+from contract_sentinel.domain.report import ContractReport, PairViolations
 from contract_sentinel.domain.rules.counterpart_mismatch import CounterpartMismatchRule
 from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
 from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
@@ -15,8 +15,6 @@ from contract_sentinel.domain.rules.type_mismatch import TypeMismatchRule
 from contract_sentinel.domain.rules.undeclared_field import UndeclaredFieldRule
 
 if TYPE_CHECKING:
-    from typing import Any
-
     from contract_sentinel.domain.rules.rule import Rule
     from contract_sentinel.domain.rules.violation import Violation
     from contract_sentinel.domain.schema import ContractField, ContractSchema
@@ -30,22 +28,6 @@ PAIR_RULES: list[Rule] = [
     MetadataMismatchRule(),
     DirectionMismatchRule(),
 ]
-
-
-@dataclasses.dataclass
-class PairViolations:
-    """Violations produced by a single producer/consumer pair."""
-
-    producer_id: str | None
-    consumer_id: str | None
-    violations: list[Violation]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "producer_id": self.producer_id,
-            "consumer_id": self.consumer_id,
-            "violations": [v.to_dict() for v in self.violations],
-        }
 
 
 def validate_contract(schemas: list[ContractSchema]) -> ContractReport:

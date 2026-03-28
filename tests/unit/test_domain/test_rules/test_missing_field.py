@@ -1,5 +1,7 @@
+from contract_sentinel.domain.report import FixSuggestion
 from contract_sentinel.domain.rules.missing_field import MissingFieldRule
-from tests.unit.helpers import create_field
+from contract_sentinel.domain.rules.rule import RuleName
+from tests.unit.helpers import create_field, create_violation
 
 
 class TestMissingFieldRule:
@@ -31,3 +33,13 @@ class TestMissingFieldRule:
     def test_returns_empty_when_producer_is_present(self) -> None:
         # Both sides present — not a missing-field scenario.
         assert MissingFieldRule().check(create_field(), create_field()) == []
+
+    def test_suggest_fix_returns_add_field_instructions(self) -> None:
+        violation = create_violation(RuleName.MISSING_FIELD, field_path="email")
+
+        assert MissingFieldRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion="Add 'email' as a required field.",
+            consumer_suggestion=(
+                "Add a 'load_default' to field 'email', or mark it as not required."
+            ),
+        )

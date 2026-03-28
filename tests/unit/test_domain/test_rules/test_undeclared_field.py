@@ -1,6 +1,8 @@
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.undeclared_field import UndeclaredFieldRule
 from contract_sentinel.domain.schema import UnknownFieldBehaviour
-from tests.unit.helpers import create_field
+from tests.unit.helpers import create_field, create_violation
 
 
 class TestUndeclaredFieldRule:
@@ -39,3 +41,17 @@ class TestUndeclaredFieldRule:
         producer_field = create_field(name="extra", type="string")
 
         assert UndeclaredFieldRule().check(producer_field, None) == []
+
+    def test_suggest_fix_returns_undeclared_field_instructions(self) -> None:
+        violation = create_violation(RuleName.UNDECLARED_FIELD, field_path="extra_field")
+
+        assert UndeclaredFieldRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Remove field 'extra_field' from your schema,"
+                " or rename it to match a field declared in the consumer."
+            ),
+            consumer_suggestion=(
+                "Declare field 'extra_field' in your schema,"
+                " or change the unknown field policy from 'forbid' to 'ignore' or 'allow'."
+            ),
+        )

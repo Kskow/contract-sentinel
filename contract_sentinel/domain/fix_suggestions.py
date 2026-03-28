@@ -3,21 +3,35 @@ from __future__ import annotations
 import dataclasses
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.report import FixSuggestionsReport, TopicFixSuggestions
-from contract_sentinel.domain.rules.rule import RuleName
+from contract_sentinel.domain.report import FixSuggestion, FixSuggestionsReport, TopicFixSuggestions
+from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
+from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
+from contract_sentinel.domain.rules.missing_field import MissingFieldRule
+from contract_sentinel.domain.rules.nullability_mismatch import NullabilityMismatchRule
+from contract_sentinel.domain.rules.requirement_mismatch import RequirementMismatchRule
+from contract_sentinel.domain.rules.rule import Rule, RuleName
+from contract_sentinel.domain.rules.structure_mismatch import StructureMismatchRule
+from contract_sentinel.domain.rules.type_mismatch import TypeMismatchRule
+from contract_sentinel.domain.rules.undeclared_field import UndeclaredFieldRule
 
 if TYPE_CHECKING:
-    from contract_sentinel.domain.report import ContractReport, ValidationReport
-    from contract_sentinel.domain.rules.engine import PairViolations
+    from contract_sentinel.domain.report import ContractReport, PairViolations, ValidationReport
     from contract_sentinel.domain.rules.violation import Violation
 
 
-@dataclasses.dataclass
-class FixSuggestion:
-    """Atomic fix unit — one per CRITICAL violation."""
-
-    producer_suggestion: str
-    consumer_suggestion: str
+RULE_REGISTRY: dict[RuleName, Rule | UndeclaredFieldRule] = {
+    RuleName.TYPE_MISMATCH: TypeMismatchRule(),
+    RuleName.MISSING_FIELD: MissingFieldRule(),
+    RuleName.REQUIREMENT_MISMATCH: RequirementMismatchRule(),
+    RuleName.NULLABILITY_MISMATCH: NullabilityMismatchRule(),
+    RuleName.DIRECTION_MISMATCH: DirectionMismatchRule(),
+    RuleName.STRUCTURE_MISMATCH: StructureMismatchRule(),
+    RuleName.UNDECLARED_FIELD: UndeclaredFieldRule(),
+    RuleName.METADATA_ALLOWED_VALUES_MISMATCH: MetadataMismatchRule(),
+    RuleName.METADATA_RANGE_MISMATCH: MetadataMismatchRule(),
+    RuleName.METADATA_LENGTH_MISMATCH: MetadataMismatchRule(),
+    RuleName.METADATA_KEY_MISMATCH: MetadataMismatchRule(),
+}
 
 
 @dataclasses.dataclass
@@ -88,124 +102,6 @@ def _build_block(instructions: list[str]) -> str:
 
 
 def _instruction_for(violation: Violation) -> FixSuggestion | None:
-    """Map a single CRITICAL violation to a ``FixSuggestion``."""
-    path = violation.field_path
-    producer = violation.producer
-    consumer = violation.consumer
-
-    match violation.rule:
-        case RuleName.TYPE_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Change the type of field '{path}'"
-                    f" from '{producer['type']}' to '{consumer['type']}'."
-                ),
-                consumer_suggestion=(
-                    f"Change the type of field '{path}'"
-                    f" from '{consumer['type']}' to '{producer['type']}'."
-                ),
-            )
-        case RuleName.MISSING_FIELD:
-            return FixSuggestion(
-                producer_suggestion=f"Add '{path}' as a required field.",
-                consumer_suggestion=(
-                    f"Add a 'load_default' to field '{path}', or mark it as not required."
-                ),
-            )
-        case RuleName.REQUIREMENT_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=f"Mark field '{path}' as required.",
-                consumer_suggestion=(
-                    f"Add a 'load_default' to field '{path}', or mark it as not required."
-                ),
-            )
-        case RuleName.NULLABILITY_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=f"Remove the nullable constraint from field '{path}'.",
-                consumer_suggestion=f"Mark field '{path}' as nullable.",
-            )
-        case RuleName.DIRECTION_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Ensure field '{path}' is included in serialised output"
-                    " (remove any output-exclusion flag)."
-                ),
-                consumer_suggestion=(
-                    f"Mark field '{path}' as input-only,"
-                    " or remove the expectation of receiving it from the producer."
-                ),
-            )
-        case RuleName.STRUCTURE_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Replace the open map for field '{path}' with a fixed-schema nested object."
-                ),
-                consumer_suggestion=(
-                    f"Replace the fixed-schema nested object for field '{path}' with an open map."
-                ),
-            )
-        case RuleName.UNDECLARED_FIELD:
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Remove field '{path}' from your schema,"
-                    " or rename it to match a field declared in the consumer."
-                ),
-                consumer_suggestion=(
-                    f"Declare field '{path}' in your schema,"
-                    " or change the unknown field policy from 'forbid' to 'ignore' or 'allow'."
-                ),
-            )
-        case RuleName.METADATA_ALLOWED_VALUES_MISMATCH:
-            if producer.get("allowed_values") is None:
-                producer_instruction = (
-                    f"Add an allowed-values constraint to field '{path}'"
-                    f" whose values are a subset of {consumer['allowed_values']}."
-                )
-            else:
-                producer_instruction = (
-                    f"Restrict the allowed values for field '{path}'"
-                    f" to {consumer['allowed_values']}."
-                )
-            return FixSuggestion(
-                producer_suggestion=producer_instruction,
-                consumer_suggestion=(
-                    f"Expand the allowed values for field '{path}'"
-                    f" to include {producer['allowed_values']}."
-                ),
-            )
-        case RuleName.METADATA_RANGE_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Tighten the range constraint on field '{path}'"
-                    f" to match the consumer: {consumer['range']}."
-                ),
-                consumer_suggestion=(
-                    f"Widen the range constraint on field '{path}'"
-                    f" to accept the producer's range: {producer['range']}."
-                ),
-            )
-        case RuleName.METADATA_LENGTH_MISMATCH:
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Tighten the length constraint on field '{path}'"
-                    f" to match the consumer: {consumer['length']}."
-                ),
-                consumer_suggestion=(
-                    f"Widen the length constraint on field '{path}'"
-                    f" to accept the producer's length: {producer['length']}."
-                ),
-            )
-        case RuleName.METADATA_KEY_MISMATCH:
-            # Each dict carries exactly one key — the metadata attribute name.
-            key = next(iter(consumer))
-            return FixSuggestion(
-                producer_suggestion=(
-                    f"Change metadata '{key}' on field '{path}' to '{consumer[key]}'."
-                ),
-                consumer_suggestion=(
-                    f"Change metadata '{key}' on field '{path}' to '{producer[key]}'."
-                ),
-            )
-        case _:
-            # Non-actionable rules (e.g. COUNTERPART_MISMATCH) produce no fix.
-            return None
+    """Delegate to the rule instance responsible for this violation."""
+    rule = RULE_REGISTRY.get(violation.rule)
+    return rule.suggest_fix(violation) if rule else None

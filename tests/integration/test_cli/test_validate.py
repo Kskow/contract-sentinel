@@ -13,10 +13,10 @@ from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
     FixSuggestionsReport,
+    PairViolations,
     TopicFixSuggestions,
     ValidationReport,
 )
-from contract_sentinel.domain.rules.engine import PairViolations
 from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour

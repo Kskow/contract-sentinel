@@ -1,5 +1,7 @@
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.structure_mismatch import StructureMismatchRule
-from tests.unit.helpers import create_field
+from tests.unit.helpers import create_field, create_violation
 
 
 class TestStructureMismatchRule:
@@ -84,3 +86,15 @@ class TestStructureMismatchRule:
         producer = create_field(name="payload", type="object", fields=None)
 
         assert StructureMismatchRule().check(producer, None) == []
+
+    def test_suggest_fix_returns_structure_instructions(self) -> None:
+        violation = create_violation(RuleName.STRUCTURE_MISMATCH, field_path="metadata")
+
+        assert StructureMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Replace the open map for field 'metadata' with a fixed-schema nested object."
+            ),
+            consumer_suggestion=(
+                "Replace the fixed-schema nested object for field 'metadata' with an open map."
+            ),
+        )

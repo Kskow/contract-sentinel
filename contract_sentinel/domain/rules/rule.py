@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from contract_sentinel.domain.report import FixSuggestion
     from contract_sentinel.domain.rules.violation import Violation
     from contract_sentinel.domain.schema import ContractField
 
@@ -38,3 +39,6 @@ class Rule(ABC):
     def check(
         self, producer: ContractField | None, consumer: ContractField | None
     ) -> list[Violation]: ...
+
+    def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
+        return None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_sentinel.domain.report import FixSuggestion
 from contract_sentinel.domain.rules.rule import Rule, RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
@@ -36,3 +37,12 @@ class RequirementMismatchRule(Rule):
                 message=f"Field '{field_path}' is optional in Producer but required in Consumer.",
             )
         ]
+
+    def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
+        path = violation.field_path
+        return FixSuggestion(
+            producer_suggestion=f"Mark field '{path}' as required.",
+            consumer_suggestion=(
+                f"Add a 'load_default' to field '{path}', or mark it as not required."
+            ),
+        )
