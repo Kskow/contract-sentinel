@@ -53,8 +53,10 @@ just check
 ```
 contract_sentinel/
 ├── domain/             # Pure business logic — no I/O, no infra imports
-│   ├── participant.py  # @contract decorator, Role enum, ContractMeta
-│   ├── schema.py       # ContractField, ContractSchema, UnknownFieldBehaviour
+│   ├── participant.py      # @contract decorator, Role enum, ContractMeta
+│   ├── schema.py           # ContractField, ContractSchema, UnknownFieldBehaviour
+│   ├── report.py           # ValidationReport, ContractReport
+│   ├── fix_suggestions.py  # FixSuggestion — human-readable remediation hints per violation
 │   ├── rules/
 │   │   ├── rule.py                   # Rule(ABC) — check(producer | None, consumer | None)
 │   │   ├── violation.py              # Violation dataclass
@@ -63,6 +65,7 @@ contract_sentinel/
 │   │   ├── nullability_mismatch.py
 │   │   ├── requirement_mismatch.py
 │   │   ├── direction_mismatch.py
+│   │   ├── structure_mismatch.py
 │   │   ├── metadata_mismatch.py      # allowed_values, range, length + generic key checks
 │   │   ├── missing_field.py          # fires when producer is None
 │   │   ├── undeclared_field.py       # fires when consumer.unknown == FORBID
@@ -78,10 +81,12 @@ contract_sentinel/
 ├── services/           # Use-case orchestration
 │   ├── validate.py     # validate_local_contracts, validate_published_contracts
 │   └── publish.py      # publish_contracts — 3-phase (parse → write → prune), SHA-256 hash-gated
-└── cli/                # Typer CLI entrypoints (wired as `sentinel` script)
-    ├── main.py         # Typer app entry-point
-    ├── validate.py     # sentinel validate-local-contracts / sentinel validate-published-contracts
-    └── publish.py      # sentinel publish-contracts
+├── cli/                # Typer CLI entrypoints (wired as `sentinel` script)
+│   ├── main.py         # Typer app entry-point
+│   ├── validate.py     # sentinel validate-local-contracts / sentinel validate-published-contracts
+│   └── publish.py      # sentinel publish-contracts
+├── config.py           # Pydantic-settings Config — all env vars in one place
+└── factory.py          # get_parser / get_store — wires framework + storage adapters
 
 tests/
 ├── unit/
