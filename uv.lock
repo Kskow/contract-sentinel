@@ -1,6 +1,10 @@
 version = 1
 revision = 3
 requires-python = ">=3.12"
+conflicts = [[
+    { package = "contract-sentinel", group = "ma3" },
+    { package = "contract-sentinel", group = "ma4" },
+]]
 
 [[package]]
 name = "annotated-doc"
@@ -74,7 +78,7 @@ name = "click"
 version = "8.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-contract-sentinel-ma3' and extra == 'group-17-contract-sentinel-ma4')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/fa/656b739db8587d7b5dfa22e22ed02566950fbfbcdc20311993483657a5c0/click-8.3.1.tar.gz", hash = "sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a", size = 295065, upload-time = "2025-11-15T20:45:42.706Z" }
 wheels = [
@@ -101,10 +105,12 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "boto3" },
-    { name = "marshmallow" },
+    { name = "marshmallow", version = "3.26.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-contract-sentinel-ma3'" },
+    { name = "marshmallow", version = "4.2.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-contract-sentinel-ma4' or extra != 'group-17-contract-sentinel-ma3'" },
 ]
 marshmallow = [
-    { name = "marshmallow" },
+    { name = "marshmallow", version = "3.26.2", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-contract-sentinel-ma3'" },
+    { name = "marshmallow", version = "4.2.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-contract-sentinel-ma4' or extra != 'group-17-contract-sentinel-ma3'" },
 ]
 s3 = [
     { name = "boto3" },
@@ -114,20 +120,25 @@ s3 = [
 dev = [
     { name = "boto3" },
     { name = "boto3-stubs", extra = ["s3"] },
-    { name = "marshmallow" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
     { name = "ruff" },
     { name = "ty" },
 ]
+ma3 = [
+    { name = "marshmallow", version = "3.26.2", source = { registry = "https://pypi.org/simple" } },
+]
+ma4 = [
+    { name = "marshmallow", version = "4.2.3", source = { registry = "https://pypi.org/simple" } },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "boto3", marker = "extra == 'all'", specifier = ">=1.42.70" },
     { name = "boto3", marker = "extra == 's3'", specifier = ">=1.42.70" },
-    { name = "marshmallow", marker = "extra == 'all'", specifier = ">=3.13,<4.0" },
-    { name = "marshmallow", marker = "extra == 'marshmallow'", specifier = ">=3.13,<4.0" },
+    { name = "marshmallow", marker = "extra == 'all'", specifier = ">=3.13,<5.0" },
+    { name = "marshmallow", marker = "extra == 'marshmallow'", specifier = ">=3.13,<5.0" },
     { name = "typer", specifier = ">=0.12" },
 ]
 provides-extras = ["s3", "marshmallow", "all"]
@@ -136,13 +147,14 @@ provides-extras = ["s3", "marshmallow", "all"]
 dev = [
     { name = "boto3", specifier = ">=1.42.70" },
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.42.70" },
-    { name = "marshmallow", specifier = ">=3.13,<4.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-cov", specifier = ">=5.0" },
     { name = "pytest-xdist", specifier = ">=3.0" },
     { name = "ruff", specifier = ">=0.9" },
     { name = "ty", specifier = ">=0.0.0a1" },
 ]
+ma3 = [{ name = "marshmallow", specifier = ">=3.13,<4.0" }]
+ma4 = [{ name = "marshmallow", specifier = ">=4.0,<5.0" }]
 
 [[package]]
 name = "coverage"
@@ -272,11 +284,20 @@ name = "marshmallow"
 version = "3.26.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging" },
+    { name = "packaging", marker = "extra == 'group-17-contract-sentinel-ma3'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/55/79/de6c16cc902f4fc372236926b0ce2ab7845268dcc30fb2fbb7f71b418631/marshmallow-3.26.2.tar.gz", hash = "sha256:bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57", size = 222095, upload-time = "2025-12-22T06:53:53.309Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl", hash = "sha256:013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73", size = 50964, upload-time = "2025-12-22T06:53:51.801Z" },
+]
+
+[[package]]
+name = "marshmallow"
+version = "4.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/ed/ecdd3a8259680dc9626ed5971b110c9be560962e11f7b0319b45ec2092b1/marshmallow-4.2.3.tar.gz", hash = "sha256:3e3fef6b3603721a25a723b8caedfa488369bddaf9bc03b40b9442c90aebd22b", size = 222932, upload-time = "2026-03-25T23:27:18.237Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/2e/ce3278954d44903ccf8606c2a16e6b3ad8e10146c21de1b7b9b0f5812b23/marshmallow-4.2.3-py3-none-any.whl", hash = "sha256:c84fd89817ecea690bde1eb925036070e5e9883148217585adc56d5cfbc082b8", size = 48876, upload-time = "2026-03-25T23:27:16.907Z" },
 ]
 
 [[package]]
@@ -329,7 +350,7 @@ name = "pytest"
 version = "9.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-contract-sentinel-ma3' and extra == 'group-17-contract-sentinel-ma4')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },

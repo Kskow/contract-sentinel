@@ -13,8 +13,10 @@
 
 `[project.optional-dependencies]` is the published package contract — it must accept both
 ma3 and ma4 (`>=3.13,<5.0`) so users are never downgraded. `[dependency-groups]` is
-dev-only, never published — `dev` pins ma3, `ma4` pins ma4, declared as conflicting so
-uv resolves and pins both independently in `uv.lock`.
+dev-only, never published — `dev` holds tooling only, `ma3` pins marshmallow 3, `ma4` pins
+marshmallow 4. `ma3` and `ma4` are declared as conflicting so uv resolves and pins both
+independently in `uv.lock`. `default-groups = ["dev", "ma3"]` gives contributors ma3 by
+default without any extra flags.
 
 ### Adapter restructure
 
@@ -57,10 +59,11 @@ with the test and scales to future version-specific test files without touching 
 
 ---
 
-### TICKET-01 — Update `pyproject.toml`: published constraint, ma4 dev group, pytest marker
+### TICKET-01 — Update `pyproject.toml`: published constraint, ma4 dev group, pytest marker ✅
 
 **Depends on:** –
 **Type:** Infra
+**Status:** Done
 
 **Goal:**
 Establish the correct dependency constraints for both end users and the dev environment, and
@@ -80,23 +83,39 @@ all = ["boto3>=1.42.70", "marshmallow>=3.13,<5.0"]   # was <4.0
 ```
 
 *Dev groups — internal, never published:*
+
+> **Implementation note:** The ticket originally placed `marshmallow>=3.13,<4.0` inside the
+> `dev` group and declared `[dev, ma4]` as the conflicting pair. This caused `uv run --group
+> ma4` to fail immediately because uv auto-includes `dev` (which carries `marshmallow<4.0`),
+> making the conflict unresolvable at runtime.
+>
+> The fix: `dev` holds tooling only (no marshmallow). A dedicated `ma3` group holds the
+> marshmallow 3 pin. `default-groups = ["dev", "ma3"]` preserves the daily-dev experience.
+> The conflict is correctly declared between `ma3` ↔ `ma4` — the two things that actually
+> conflict. Downstream invocations become:
+> - ma3 run (default): `uv run pytest tests/ -m "not ma4"`
+> - ma4 run: `uv run --no-group ma3 --group ma4 pytest tests/ -m "ma4"`
+
 ```toml
 [dependency-groups]
 dev = [
-    # marshmallow pin stays at <4.0 — daily dev uses ma3
-    "marshmallow>=3.13,<4.0",
+    # tooling only — no marshmallow here
     ...
+]
+ma3 = [
+    "marshmallow>=3.13,<4.0",
 ]
 ma4 = [
     "marshmallow>=4.0,<5.0",
 ]
 ```
 
-*Conflict declaration — tells uv to resolve dev and ma4 independently:*
+*Conflict declaration — tells uv to resolve ma3 and ma4 independently:*
 ```toml
 [tool.uv]
+default-groups = ["dev", "ma3"]
 conflicts = [
-    [{ group = "dev" }, { group = "ma4" }],
+    [{ group = "ma3" }, { group = "ma4" }],
 ]
 ```
 
@@ -107,14 +126,14 @@ markers = ["ma4: tests that require marshmallow 4"]
 ```
 
 **Done when:**
-- [ ] `[project.optional-dependencies]` reads `>=3.13,<5.0` in both `marshmallow` and `all`.
-- [ ] `[dependency-groups]` has a new `ma4` group with `marshmallow>=4.0,<5.0`.
-- [ ] `[tool.uv] conflicts` is declared between `dev` and `ma4` groups.
-- [ ] `uv lock` succeeds and `uv.lock` contains pinned entries for both a marshmallow 3.x
-  version (dev group) and a marshmallow 4.x version (ma4 group).
-- [ ] `uv run --group ma4 pytest --collect-only` resolves without dependency errors
-  (0 tests collected is fine at this stage — confirms group resolution works).
-- [ ] `ma4` marker is registered in `[tool.pytest.ini_options]`.
+- [x] `[project.optional-dependencies]` reads `>=3.13,<5.0` in both `marshmallow` and `all`.
+- [x] `[dependency-groups]` has a new `ma4` group with `marshmallow>=4.0,<5.0`.
+- [x] `[tool.uv] conflicts` is declared between `ma3` and `ma4` groups.
+- [x] `uv lock` succeeds and `uv.lock` contains pinned entries for both a marshmallow 3.x
+  version (ma3 group, `3.26.2`) and a marshmallow 4.x version (ma4 group, `4.2.3`).
+- [x] `uv run --no-group ma3 --group ma4 pytest --collect-only` resolves without dependency
+  errors — 303 tests collected inside the app container.
+- [x] `ma4` marker is registered in `[tool.pytest.ini_options]`.
 
 ---
 
