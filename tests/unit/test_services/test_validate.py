@@ -6,12 +6,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import marshmallow
 
-from contract_sentinel.domain.rules.engine import PairViolations
-from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.services.validate import (
-    ContractReport,
-    ContractsValidationReport,
-    ValidationStatus,
     validate_local_contracts,
     validate_published_contracts,
 )
@@ -66,132 +61,6 @@ def _config(name: str = "test-repo") -> MagicMock:
     return cfg
 
 
-class TestContractReportToDict:
-    def test_serialises_empty_pairs(self) -> None:
-        report = ContractReport(topic="orders", status=ValidationStatus.PASSED, pairs=[])
-
-        assert report.to_dict() == {
-            "topic": "orders",
-            "status": "PASSED",
-            "pairs": [],
-        }
-
-    def test_serialises_pairs_with_violations(self) -> None:
-        report = ContractReport(
-            topic="orders",
-            status=ValidationStatus.FAILED,
-            pairs=[
-                PairViolations(
-                    producer_id="orders-service/OrderSchema",
-                    consumer_id="checkout-service/OrderSchema",
-                    violations=[
-                        Violation(
-                            rule="TYPE_MISMATCH",
-                            severity="CRITICAL",
-                            field_path="id",
-                            producer={"type": "string"},
-                            consumer={"type": "integer"},
-                            message=(
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
-                        )
-                    ],
-                )
-            ],
-        )
-
-        assert report.to_dict() == {
-            "topic": "orders",
-            "status": "FAILED",
-            "pairs": [
-                {
-                    "producer_id": "orders-service/OrderSchema",
-                    "consumer_id": "checkout-service/OrderSchema",
-                    "violations": [
-                        {
-                            "rule": "TYPE_MISMATCH",
-                            "severity": "CRITICAL",
-                            "field_path": "id",
-                            "producer": {"type": "string"},
-                            "consumer": {"type": "integer"},
-                            "message": (
-                                "Field 'id' is a 'string' in Producer"
-                                " but Consumer expects a 'integer'."
-                            ),
-                        }
-                    ],
-                }
-            ],
-        }
-
-
-class TestContractsValidationReportToDict:
-    def test_serialises_empty_reports(self) -> None:
-        report = ContractsValidationReport(status=ValidationStatus.PASSED, reports=[])
-
-        assert report.to_dict() == {"status": "PASSED", "reports": []}
-
-    def test_serialises_nested_reports_and_pairs(self) -> None:
-        report = ContractsValidationReport(
-            status=ValidationStatus.FAILED,
-            reports=[
-                ContractReport(
-                    topic="orders",
-                    status=ValidationStatus.FAILED,
-                    pairs=[
-                        PairViolations(
-                            producer_id="orders-service/OrderSchema",
-                            consumer_id="checkout-service/OrderSchema",
-                            violations=[
-                                Violation(
-                                    rule="TYPE_MISMATCH",
-                                    severity="CRITICAL",
-                                    field_path="id",
-                                    producer={"type": "string"},
-                                    consumer={"type": "integer"},
-                                    message=(
-                                        "Field 'id' is a 'string' in Producer"
-                                        " but Consumer expects a 'integer'."
-                                    ),
-                                )
-                            ],
-                        )
-                    ],
-                )
-            ],
-        )
-
-        assert report.to_dict() == {
-            "status": "FAILED",
-            "reports": [
-                {
-                    "topic": "orders",
-                    "status": "FAILED",
-                    "pairs": [
-                        {
-                            "producer_id": "orders-service/OrderSchema",
-                            "consumer_id": "checkout-service/OrderSchema",
-                            "violations": [
-                                {
-                                    "rule": "TYPE_MISMATCH",
-                                    "severity": "CRITICAL",
-                                    "field_path": "id",
-                                    "producer": {"type": "string"},
-                                    "consumer": {"type": "integer"},
-                                    "message": (
-                                        "Field 'id' is a 'string' in Producer"
-                                        " but Consumer expects a 'integer'."
-                                    ),
-                                }
-                            ],
-                        }
-                    ],
-                }
-            ],
-        }
-
-
 class TestValidateLocalContracts:
     def test_returns_passed_when_no_local_classes(self) -> None:
         result = validate_local_contracts(
@@ -201,7 +70,7 @@ class TestValidateLocalContracts:
             config=_config(),
         )
 
-        assert result.to_dict() == {"status": "PASSED", "reports": []}
+        assert result.to_dict() == {"status": "PASSED", "contracts": []}
 
     def test_returns_passed_for_compatible_pair(self) -> None:
         producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
@@ -216,7 +85,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -244,7 +113,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "FAILED",
@@ -283,7 +152,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -320,7 +189,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [],
+            "contracts": [],
         }
 
     def test_topic_filter_logs_warning_for_missing_topic(
@@ -356,7 +225,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -422,7 +291,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders/created",
                     "status": "PASSED",
@@ -459,7 +328,7 @@ class TestValidateLocalContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -502,7 +371,7 @@ class TestValidatePublishedContracts:
     def test_returns_passed_when_store_is_empty(self) -> None:
         result = validate_published_contracts(store=_store())
 
-        assert result.to_dict() == {"status": "PASSED", "reports": []}
+        assert result.to_dict() == {"status": "PASSED", "contracts": []}
 
     def test_returns_passed_for_compatible_pair(self) -> None:
         producer_schema = create_schema(role="producer", fields=[create_field("id", "string")])
@@ -512,7 +381,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -535,7 +404,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "FAILED",
@@ -569,7 +438,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -605,7 +474,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [],
+            "contracts": [],
         }
 
     def test_topic_filter_logs_warning_for_missing_topic(
@@ -634,7 +503,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -674,7 +543,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "FAILED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders",
                     "status": "PASSED",
@@ -723,7 +592,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders/created",
                     "status": "PASSED",
@@ -762,7 +631,7 @@ class TestValidatePublishedContracts:
 
         assert result.to_dict() == {
             "status": "PASSED",
-            "reports": [
+            "contracts": [
                 {
                     "topic": "orders/created",
                     "status": "PASSED",
