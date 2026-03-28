@@ -1,0 +1,347 @@
+# Marshmallow 4 Support — Dev Tickets
+
+**Feature slug:** `004-marshmallow4-support`
+**Spec:** `docs/features/004-marshmallow4-support/product_spec.md`
+**Design:** `docs/features/004-marshmallow4-support/design.md`
+**Created:** 2026-03-28
+
+---
+
+## Architecture Notes
+
+### Two separate constraint concerns
+
+`[project.optional-dependencies]` is the published package contract — it must accept both
+ma3 and ma4 (`>=3.13,<5.0`) so users are never downgraded. `[dependency-groups]` is
+dev-only, never published — `dev` pins ma3, `ma4` pins ma4, declared as conflicting so
+uv resolves and pins both independently in `uv.lock`.
+
+### Adapter restructure
+
+`adapters/schema_parser.py` is split into a `schema_parsers/` package. The ABC lives alone
+in `schema_parser.py`; both marshmallow parsers live in `marshmallow.py`. This is the
+foundational layout for future framework adapters (pydantic, dataclasses).
+
+### Only two breaking ma4 changes require code
+
+1. `List.inner` → `List.value_field` — `Marshmallow4Parser` overrides `_resolve_list` only.
+2. `Schema.unknown` default `RAISE` → `EXCLUDE` — handled entirely in test expectations,
+   no production logic change.
+
+### Multi-version test separation: pytest marker
+
+`test_schema_parser_ma4.py` carries `pytestmark = pytest.mark.ma4`. The ma3 run uses
+`-m "not ma4"`, the ma4 run uses `-m "ma4"`. No `skipif`. No `--ignore`. The marker lives
+with the test and scales to future version-specific test files without touching any recipe.
+
+### Import sites changed by TICKET-02
+
+| File | Change |
+|---|---|
+| `contract_sentinel/factory.py` | TYPE_CHECKING + runtime imports |
+| `tests/unit/test_factory.py` | Import path |
+| `tests/integration/test_adapters/test_schema_parser_ma3.py` | Renamed file + import |
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `contract_sentinel/adapters/schema_parsers/__init__.py` | Re-exports public symbols |
+| `contract_sentinel/adapters/schema_parsers/schema_parser.py` | SchemaParser ABC |
+| `contract_sentinel/adapters/schema_parsers/marshmallow.py` | Marshmallow3Parser + Marshmallow4Parser |
+| `tests/integration/test_adapters/test_schema_parser_ma4.py` | TestMarshmallow4Parser |
+
+---
+
+## Tickets
+
+---
+
+### TICKET-01 — Update `pyproject.toml`: published constraint, ma4 dev group, pytest marker
+
+**Depends on:** –
+**Type:** Infra
+
+**Goal:**
+Establish the correct dependency constraints for both end users and the dev environment, and
+register the `ma4` pytest marker so the test separation works from the start.
+
+**Files to create / modify:**
+- `pyproject.toml` — modify
+- Run `uv lock` after changes
+
+**Changes in detail:**
+
+*Published extras — user-facing, no downgrade:*
+```toml
+[project.optional-dependencies]
+marshmallow = ["marshmallow>=3.13,<5.0"]   # was <4.0
+all = ["boto3>=1.42.70", "marshmallow>=3.13,<5.0"]   # was <4.0
+```
+
+*Dev groups — internal, never published:*
+```toml
+[dependency-groups]
+dev = [
+    # marshmallow pin stays at <4.0 — daily dev uses ma3
+    "marshmallow>=3.13,<4.0",
+    ...
+]
+ma4 = [
+    "marshmallow>=4.0,<5.0",
+]
+```
+
+*Conflict declaration — tells uv to resolve dev and ma4 independently:*
+```toml
+[tool.uv]
+conflicts = [
+    [{ group = "dev" }, { group = "ma4" }],
+]
+```
+
+*Pytest marker registration:*
+```toml
+[tool.pytest.ini_options]
+markers = ["ma4: tests that require marshmallow 4"]
+```
+
+**Done when:**
+- [ ] `[project.optional-dependencies]` reads `>=3.13,<5.0` in both `marshmallow` and `all`.
+- [ ] `[dependency-groups]` has a new `ma4` group with `marshmallow>=4.0,<5.0`.
+- [ ] `[tool.uv] conflicts` is declared between `dev` and `ma4` groups.
+- [ ] `uv lock` succeeds and `uv.lock` contains pinned entries for both a marshmallow 3.x
+  version (dev group) and a marshmallow 4.x version (ma4 group).
+- [ ] `uv run --group ma4 pytest --collect-only` resolves without dependency errors
+  (0 tests collected is fine at this stage — confirms group resolution works).
+- [ ] `ma4` marker is registered in `[tool.pytest.ini_options]`.
+
+---
+
+### TICKET-02 — Restructure schema_parser adapter into `schema_parsers/` package
+
+**Depends on:** –
+**Type:** Adapter
+
+**Goal:**
+Split `adapters/schema_parser.py` into a proper package that hosts the ABC and marshmallow
+implementations separately. Zero logic changes — this is a pure structural refactor.
+
+**Files to create / modify:**
+- `contract_sentinel/adapters/schema_parsers/__init__.py` — create
+- `contract_sentinel/adapters/schema_parsers/schema_parser.py` — create
+- `contract_sentinel/adapters/schema_parsers/marshmallow.py` — create
+- `contract_sentinel/adapters/schema_parser.py` — delete
+- `contract_sentinel/factory.py` — modify (imports only)
+- `tests/unit/test_factory.py` — modify (import only)
+- `tests/integration/test_adapters/test_schema_parser.py` — rename to `test_schema_parser_ma3.py` + modify (import only)
+
+**Content split:**
+
+`schema_parsers/schema_parser.py` receives:
+- `SchemaParser(ABC)` verbatim. No marshmallow imports.
+
+`schema_parsers/marshmallow.py` receives:
+- The `TYPE_CHECKING` block with marshmallow type imports.
+- `_ResolvedFieldType` NamedTuple.
+- `_TypeMapEntry` NamedTuple.
+- `Marshmallow3Parser` verbatim.
+
+`schema_parsers/__init__.py`:
+```python
+from contract_sentinel.adapters.schema_parsers.schema_parser import SchemaParser
+from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
+
+__all__ = ["SchemaParser", "Marshmallow3Parser"]
+```
+
+**Import updates (no logic changes):**
+- `factory.py` TYPE_CHECKING: `adapters.schema_parser` → `adapters.schema_parsers.schema_parser`
+- `factory.py` runtime: `adapters.schema_parser` → `adapters.schema_parsers.marshmallow`
+- `test_factory.py`: `adapters.schema_parser` → `adapters.schema_parsers.marshmallow`
+- `test_schema_parser_ma3.py` (renamed from `test_schema_parser.py`): same path update
+
+**Done when:**
+- [ ] `contract_sentinel/adapters/schema_parser.py` no longer exists.
+- [ ] `contract_sentinel/adapters/schema_parsers/` contains `__init__.py`, `schema_parser.py`,
+  `marshmallow.py`.
+- [ ] `tests/integration/test_adapters/test_schema_parser_ma3.py` exists (renamed).
+- [ ] `uv run pytest tests/ -m "not ma4"` passes with zero failures — no logic changed.
+- [ ] `uv run ty check` passes with no new errors.
+
+---
+
+### TICKET-03 — Add `Marshmallow4Parser`
+
+**Depends on:** TICKET-02
+**Type:** Adapter
+
+**Goal:**
+Add `Marshmallow4Parser` to `marshmallow.py` and export it — a subclass of
+`Marshmallow3Parser` that overrides `_resolve_list` to use `field.value_field`.
+
+**Files to create / modify:**
+- `contract_sentinel/adapters/schema_parsers/marshmallow.py` — modify (append class)
+- `contract_sentinel/adapters/schema_parsers/__init__.py` — modify (add export)
+
+**Implementation notes:**
+- The class body is a single method override of `_resolve_list`.
+- `field.value_field` is the ma4 attribute name for the inner element field of `List`.
+- Before committing: read the marshmallow 4 CHANGELOG in full and confirm no field
+  attribute renames exist beyond `List.inner`. Add overrides for any that do and open
+  a follow-up ticket for each.
+- Verify `marshmallow.missing` sentinel is still accessible in ma4 (`self._ma.missing`
+  in `_build_metadata`). If removed, fall back to `marshmallow.utils.missing`.
+
+**Done when:**
+- [ ] `Marshmallow4Parser` exists in `marshmallow.py`, extends `Marshmallow3Parser`.
+- [ ] `Marshmallow4Parser._resolve_list` accesses `field.value_field`, not `field.inner`.
+- [ ] `Marshmallow4Parser` is in `schema_parsers/__init__.py` exports and `__all__`.
+- [ ] `uv run ty check` passes with no new errors.
+
+---
+
+### TICKET-04 — Route factory to correct parser by marshmallow major version
+
+**Depends on:** TICKET-03
+**Type:** Adapter
+
+**Goal:**
+Update `factory.get_parser` to automatically select `Marshmallow3Parser` or
+`Marshmallow4Parser` based on the installed marshmallow version, and update
+`test_factory.py` to cover both routing paths.
+
+**Files to create / modify:**
+- `contract_sentinel/factory.py` — modify
+- `tests/unit/test_factory.py` — modify
+
+**Implementation notes:**
+- Detect version: `importlib.metadata.version("marshmallow")` + `packaging.version.Version(...).major`.
+- `packaging` is a transitive dep of marshmallow — no new dependency needed.
+- Version detection and class selection live inside the `Framework.MARSHMALLOW` branch.
+  No new public API is added.
+- The `MissingDependencyError` guard is unchanged.
+
+**`test_factory.py` changes:**
+- `test_returns_marshmallow3_parser_for_marshmallow_framework`: mock
+  `importlib.metadata.version` to return `"3.26.2"` → assert `isinstance(parser, Marshmallow3Parser)`.
+- `test_marshmallow_parser_carries_the_supplied_repository`: same mock applied.
+- Add `test_returns_marshmallow4_parser_when_ma4_is_installed`: mock version to `"4.0.0"`
+  → assert `isinstance(parser, Marshmallow4Parser)`.
+- `test_raises_missing_dependency_error_when_marshmallow_not_installed`: unchanged.
+
+**Done when:**
+- [ ] With ma3 mocked, `get_parser` returns `Marshmallow3Parser`.
+- [ ] With ma4 mocked, `get_parser` returns `Marshmallow4Parser`.
+- [ ] All tests in `test_factory.py` pass.
+- [ ] `uv run ty check` passes.
+
+---
+
+### TICKET-05 — Update `just test`, `just check`, and CI for two-version test runs
+
+**Depends on:** TICKET-01
+**Type:** Infra
+
+**Goal:**
+Wire the two-step test invocation into `justfile` and CI so both marshmallow versions are
+always verified — locally and on every push.
+
+**Files to create / modify:**
+- `justfile` — modify
+- `.github/workflows/quality.yml` — modify
+
+**`justfile` changes:**
+
+```
+# Run full test suite in parallel (-n auto via addopts)
+test:
+    docker compose run --rm app uv run pytest tests/ -m "not ma4"
+    docker compose run --rm app uv run --group ma4 pytest tests/ -m "ma4" -v
+
+# Run tests sequentially — use when debugging with --pdb
+test-seq:
+    docker compose run --rm app uv run pytest -n0
+
+# Run tests with coverage report
+test-cov:
+    docker compose run --rm app uv run pytest tests/ -m "not ma4" --cov=contract_sentinel --cov-report=term-missing
+
+# Full quality gate — mirrors CI
+check:
+    docker compose run --rm app sh -c "\
+        uv run ruff check . && \
+        uv run ruff format --check . && \
+        uv run ty check && \
+        uv run pytest tests/ -m 'not ma4' && \
+        uv run --group ma4 pytest tests/ -m 'ma4' -v"
+```
+
+`test-seq` intentionally runs only the ma3 suite (`-m "not ma4"` via `addopts` is not set,
+so it collects everything except ma4-marked tests naturally) — it is the escape hatch for
+single-session debugging only.
+
+**`quality.yml` changes:**
+
+Replace the single `Test` step with two steps:
+
+```yaml
+- name: Test (ma3)
+  run: uv run pytest tests/ -m "not ma4"
+
+- name: Test (ma4)
+  run: uv run --group ma4 pytest tests/ -m "ma4" -v
+```
+
+The LocalStack service already present in the job serves the ma3 step. The ma4 step makes
+no AWS calls and needs no LocalStack.
+
+**Done when:**
+- [ ] `just test` runs both steps sequentially; the ma4 step exits with code 5 (no tests
+  collected yet — expected before TICKET-06) and the recipe continues without error.
+- [ ] `just check` includes both test steps after typecheck.
+- [ ] `quality.yml` has two test steps: `Test (ma3)` and `Test (ma4)`.
+- [ ] A CI run triggered at this point shows `Test (ma3)` green and `Test (ma4)` green
+  (0 collected is a passing run in pytest terms for the ma4 step at this stage).
+
+---
+
+### TICKET-06 — Write `TestMarshmallow4Parser` integration tests
+
+**Depends on:** TICKET-03, TICKET-04, TICKET-05
+**Type:** Adapter
+
+**Goal:**
+Create `test_schema_parser_ma4.py` with a self-contained `TestMarshmallow4Parser` class and
+confirm `just test` passes both steps end-to-end with zero failures.
+
+**Files to create / modify:**
+- `tests/integration/test_adapters/test_schema_parser_ma4.py` — create
+
+**Coverage requirements:**
+
+Mirror every test in `TestMarshmallow3Parser`. The only assertions that differ are those on
+schemas without an explicit `Meta.unknown`:
+
+| Scenario | Ma3 | Ma4 |
+|---|---|---|
+| Any schema without `Meta.unknown` | `"unknown": "forbid"` | `"unknown": "ignore"` |
+
+All other assertions — types, formats, nullability, required, load/dump only, data_key, all
+validators (Length, Range, Regexp, OneOf, And), nested, dict, tuple, method, function,
+constant, enum, `unknown_policy_inherited_from_parent_schema` — are identical and must be
+present verbatim. The file must be runnable in total isolation from `test_schema_parser_ma3.py`.
+
+**Implementation notes:**
+- Module-level: `pytestmark = pytest.mark.ma4`.
+- Imports `Marshmallow4Parser` from `contract_sentinel.adapters.schema_parsers.marshmallow`.
+- No `skipif` markers anywhere in this file.
+- `uv run --group ma4 pytest` installs marshmallow 4, so `field.value_field` is the live
+  attribute — `List` tests exercise the override for real.
+
+**Done when:**
+- [ ] `test_schema_parser_ma4.py` exists with `pytestmark = pytest.mark.ma4` and
+  `TestMarshmallow4Parser` covering all scenarios listed above.
+- [ ] `just test` runs both steps to completion with zero failures and zero errors.
+- [ ] `just test` (ma3 step) continues to pass `test_schema_parser_ma3.py` unmodified.
+- [ ] CI passes both `Test (ma3)` and `Test (ma4)` steps green.
