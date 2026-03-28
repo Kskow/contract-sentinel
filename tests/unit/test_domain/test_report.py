@@ -9,17 +9,18 @@ from contract_sentinel.domain.report import (
     ValidationStatus,
 )
 from contract_sentinel.domain.rules.engine import PairViolations
+from contract_sentinel.domain.rules.rule import RuleName
 from tests.unit.helpers import create_violation
 
 _CRITICAL_VIOLATION = create_violation(
-    "TYPE_MISMATCH",
+    RuleName.TYPE_MISMATCH,
     field_path="id",
     producer={"type": "string"},
     consumer={"type": "integer"},
     message="Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.",
 )
 _WARNING_VIOLATION = create_violation(
-    "COUNTERPART_MISMATCH",
+    RuleName.COUNTERPART_MISMATCH,
     severity="WARNING",
     field_path="",
     message="Topic 'orders' has 1 producer(s) but no matching consumer.",

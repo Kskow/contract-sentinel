@@ -65,12 +65,12 @@ Replace the bare `str` on `Violation.rule` with a `RuleName(StrEnum)` so that ru
 - All `tests/unit/test_domain/test_rules/test_*.py` — modify; `create_violation("RULE_NAME", ...)` call sites → `create_violation(RuleName.RULE_NAME, ...)`
 
 **Done when:**
-- [ ] `RuleName` is defined in `rule_name.py` with all 12 members listed above
-- [ ] `Violation.rule` is annotated `RuleName`, not `str`
-- [ ] Every `Violation(rule=..., ...)` construction in production code passes a `RuleName` member, not a string literal
-- [ ] Every `case "..."` in `fix_suggestions._instruction_for` is replaced with `case RuleName.X:`
-- [ ] `create_violation` in `tests/unit/helpers.py` accepts `RuleName`, not `str`
-- [ ] `just check` passes (lint, typecheck, all tests green)
+- [x] `RuleName` is defined in `rule.py` (co-located with `Rule`) with all 12 members listed above
+- [x] `Violation.rule` is annotated `RuleName`, not `str`
+- [x] Every `Violation(rule=..., ...)` construction in production code passes a `RuleName` member, not a string literal
+- [x] Every `case "..."` in `fix_suggestions._instruction_for` is replaced with `case RuleName.X:`
+- [x] `create_violation` in `tests/unit/helpers.py` accepts `RuleName`, not `str`
+- [x] `just check` passes (lint, typecheck, all tests green)
 
 ---
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.rules.rule import Rule
+from contract_sentinel.domain.rules.rule import Rule, RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ class TypeMismatchRule(Rule):
         field_path = producer.name
         return [
             Violation(
-                rule="TYPE_MISMATCH",
+                rule=RuleName.TYPE_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"type": producer.type},

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from contract_sentinel.domain.rules.violation import Violation
+
+if TYPE_CHECKING:
+    from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 
 
 def create_violation(
-    rule: str,
+    rule: RuleName,
     severity: str = "CRITICAL",
     field_path: str = "field_name",
     producer: dict | None = None,

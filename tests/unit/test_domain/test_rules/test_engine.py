@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from contract_sentinel.domain.rules.engine import PairViolations, validate_contract
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 from tests.unit.helpers import create_field, create_schema
@@ -10,7 +11,7 @@ from tests.unit.helpers import create_field, create_schema
 
 def _violation(field_path: str = "field") -> Violation:
     return Violation(
-        rule="TEST_RULE",
+        rule=RuleName.TYPE_MISMATCH,
         severity="CRITICAL",
         field_path=field_path,
         producer={},

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from contract_sentinel.domain.rules.rule import Rule
+from contract_sentinel.domain.rules.rule import Rule, RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 if TYPE_CHECKING:
@@ -62,7 +62,7 @@ class MetadataMismatchRule(Rule):
         if producer_values is None:
             return [
                 Violation(
-                    rule="METADATA_ALLOWED_VALUES_MISMATCH",
+                    rule=RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
                     severity="CRITICAL",
                     field_path=field_path,
                     producer={"allowed_values": None},
@@ -81,7 +81,7 @@ class MetadataMismatchRule(Rule):
 
         return [
             Violation(
-                rule="METADATA_ALLOWED_VALUES_MISMATCH",
+                rule=RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"allowed_values": producer_values},
@@ -102,7 +102,7 @@ class MetadataMismatchRule(Rule):
         if p_range is None:
             return [
                 Violation(
-                    rule="METADATA_RANGE_MISMATCH",
+                    rule=RuleName.METADATA_RANGE_MISMATCH,
                     severity="CRITICAL",
                     field_path=field_path,
                     producer={"range": None},
@@ -124,7 +124,7 @@ class MetadataMismatchRule(Rule):
             if p_min is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_RANGE_MISMATCH",
+                        rule=RuleName.METADATA_RANGE_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"range": p_range},
@@ -142,7 +142,7 @@ class MetadataMismatchRule(Rule):
                 if p_min < c_min or (p_min == c_min and p_min_incl and not c_min_incl):
                     violations.append(
                         Violation(
-                            rule="METADATA_RANGE_MISMATCH",
+                            rule=RuleName.METADATA_RANGE_MISMATCH,
                             severity="CRITICAL",
                             field_path=field_path,
                             producer={"range": p_range},
@@ -164,7 +164,7 @@ class MetadataMismatchRule(Rule):
             if p_max is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_RANGE_MISMATCH",
+                        rule=RuleName.METADATA_RANGE_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"range": p_range},
@@ -182,7 +182,7 @@ class MetadataMismatchRule(Rule):
                 if p_max > c_max or (p_max == c_max and p_max_incl and not c_max_incl):
                     violations.append(
                         Violation(
-                            rule="METADATA_RANGE_MISMATCH",
+                            rule=RuleName.METADATA_RANGE_MISMATCH,
                             severity="CRITICAL",
                             field_path=field_path,
                             producer={"range": p_range},
@@ -208,7 +208,7 @@ class MetadataMismatchRule(Rule):
         if p_length is None:
             return [
                 Violation(
-                    rule="METADATA_LENGTH_MISMATCH",
+                    rule=RuleName.METADATA_LENGTH_MISMATCH,
                     severity="CRITICAL",
                     field_path=field_path,
                     producer={"length": None},
@@ -232,7 +232,7 @@ class MetadataMismatchRule(Rule):
             if p_min is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -247,7 +247,7 @@ class MetadataMismatchRule(Rule):
             elif p_min < c_min:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -264,7 +264,7 @@ class MetadataMismatchRule(Rule):
             if p_max is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -279,7 +279,7 @@ class MetadataMismatchRule(Rule):
             elif p_max > c_max:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -310,7 +310,7 @@ class MetadataMismatchRule(Rule):
 
         return [
             Violation(
-                rule="METADATA_KEY_MISMATCH",
+                rule=RuleName.METADATA_KEY_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={key: producer_value},

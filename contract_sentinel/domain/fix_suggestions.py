@@ -4,6 +4,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 from contract_sentinel.domain.report import FixSuggestionsReport, TopicFixSuggestions
+from contract_sentinel.domain.rules.rule import RuleName
 
 if TYPE_CHECKING:
     from contract_sentinel.domain.report import ContractReport, ValidationReport
@@ -93,7 +94,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
     consumer = violation.consumer
 
     match violation.rule:
-        case "TYPE_MISMATCH":
+        case RuleName.TYPE_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=(
                     f"Change the type of field '{path}'"
@@ -104,26 +105,26 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     f" from '{consumer['type']}' to '{producer['type']}'."
                 ),
             )
-        case "MISSING_FIELD":
+        case RuleName.MISSING_FIELD:
             return FixSuggestion(
                 producer_suggestion=f"Add '{path}' as a required field.",
                 consumer_suggestion=(
                     f"Add a 'load_default' to field '{path}', or mark it as not required."
                 ),
             )
-        case "REQUIREMENT_MISMATCH":
+        case RuleName.REQUIREMENT_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=f"Mark field '{path}' as required.",
                 consumer_suggestion=(
                     f"Add a 'load_default' to field '{path}', or mark it as not required."
                 ),
             )
-        case "NULLABILITY_MISMATCH":
+        case RuleName.NULLABILITY_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=f"Remove the nullable constraint from field '{path}'.",
                 consumer_suggestion=f"Mark field '{path}' as nullable.",
             )
-        case "DIRECTION_MISMATCH":
+        case RuleName.DIRECTION_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=(
                     f"Ensure field '{path}' is included in serialised output"
@@ -134,7 +135,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     " or remove the expectation of receiving it from the producer."
                 ),
             )
-        case "STRUCTURE_MISMATCH":
+        case RuleName.STRUCTURE_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=(
                     f"Replace the open map for field '{path}' with a fixed-schema nested object."
@@ -143,7 +144,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     f"Replace the fixed-schema nested object for field '{path}' with an open map."
                 ),
             )
-        case "UNDECLARED_FIELD":
+        case RuleName.UNDECLARED_FIELD:
             return FixSuggestion(
                 producer_suggestion=(
                     f"Remove field '{path}' from your schema,"
@@ -154,7 +155,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     " or change the unknown field policy from 'forbid' to 'ignore' or 'allow'."
                 ),
             )
-        case "METADATA_ALLOWED_VALUES_MISMATCH":
+        case RuleName.METADATA_ALLOWED_VALUES_MISMATCH:
             if producer.get("allowed_values") is None:
                 producer_instruction = (
                     f"Add an allowed-values constraint to field '{path}'"
@@ -172,7 +173,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     f" to include {producer['allowed_values']}."
                 ),
             )
-        case "METADATA_RANGE_MISMATCH":
+        case RuleName.METADATA_RANGE_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=(
                     f"Tighten the range constraint on field '{path}'"
@@ -183,7 +184,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     f" to accept the producer's range: {producer['range']}."
                 ),
             )
-        case "METADATA_LENGTH_MISMATCH":
+        case RuleName.METADATA_LENGTH_MISMATCH:
             return FixSuggestion(
                 producer_suggestion=(
                     f"Tighten the length constraint on field '{path}'"
@@ -194,7 +195,7 @@ def _instruction_for(violation: Violation) -> FixSuggestion | None:
                     f" to accept the producer's length: {producer['length']}."
                 ),
             )
-        case "METADATA_KEY_MISMATCH":
+        case RuleName.METADATA_KEY_MISMATCH:
             # Each dict carries exactly one key — the metadata attribute name.
             key = next(iter(consumer))
             return FixSuggestion(

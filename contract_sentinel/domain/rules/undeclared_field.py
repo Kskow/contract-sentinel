@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import UnknownFieldBehaviour
 
@@ -32,7 +33,7 @@ class UndeclaredFieldRule:
         field_path = producer.name
         return [
             Violation(
-                rule="UNDECLARED_FIELD",
+                rule=RuleName.UNDECLARED_FIELD,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"exists": True},
