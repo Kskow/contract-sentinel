@@ -41,7 +41,7 @@ def _store(*schemas: ContractSchema) -> ContractStore:
 
 
 def _parser(*schemas: ContractSchema) -> MagicMock:
-    from contract_sentinel.adapters.schema_parser import SchemaParser
+    from contract_sentinel.adapters.schema_parsers.parser import SchemaParser
 
     parser_instance = create_autospec(SchemaParser)
     if len(schemas) == 1:

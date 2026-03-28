@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from contract_sentinel.adapters.contract_store import ContractStore
-    from contract_sentinel.adapters.schema_parser import SchemaParser
+    from contract_sentinel.adapters.schema_parsers.parser import SchemaParser
     from contract_sentinel.config import Config
     from contract_sentinel.domain.framework import Framework
     from contract_sentinel.domain.report import ContractReport

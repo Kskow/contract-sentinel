@@ -10,11 +10,11 @@ s3 = [
     "boto3>=1.42.70",
 ]
 marshmallow = [
-    "marshmallow>=3.13,<4.0",
+    "marshmallow>=3.13,<5.0",
 ]
 all = [
     "boto3>=1.42.70",
-    "marshmallow>=3.13,<4.0",
+    "marshmallow>=3.13,<5.0",
 ]
 
 [project.scripts]
@@ -35,7 +35,7 @@ addopts = "-n auto"
 dev = [
     "boto3>=1.42.70",
     "boto3-stubs[s3]>=1.42.70",
-    "marshmallow>=3.13,<4.0",
+    "marshmallow>=3.13,<5.0",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-xdist>=3.0",

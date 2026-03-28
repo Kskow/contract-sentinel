@@ -6,7 +6,7 @@ import marshmallow as ma
 import marshmallow.validate as mv
 import pytest
 
-from contract_sentinel.adapters.schema_parser import Marshmallow3Parser
+from contract_sentinel.adapters.schema_parsers.marshmallow import MarshmallowParser
 from contract_sentinel.domain.participant import Role, contract
 
 
@@ -16,7 +16,7 @@ class _Color(enum.Enum):
     BLUE = "blue"
 
 
-class TestMarshmallow3Parser:
+class TestMarshmallowParser:
     @pytest.mark.parametrize(
         ("ma_unknown", "expected"),
         [
@@ -33,7 +33,7 @@ class TestMarshmallow3Parser:
 
             name = ma.fields.String()
 
-        result = Marshmallow3Parser(repository="svc").parse(MySchema)
+        result = MarshmallowParser(repository="svc").parse(MySchema)
 
         assert result.to_dict()["unknown"] == expected
 
@@ -46,7 +46,7 @@ class TestMarshmallow3Parser:
         class ChildSchema(BaseSchema):
             name = ma.fields.String()
 
-        result = Marshmallow3Parser(repository="svc").parse(ChildSchema)
+        result = MarshmallowParser(repository="svc").parse(ChildSchema)
 
         assert result.to_dict()["unknown"] == "ignore"
 
@@ -56,7 +56,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             name = ma.fields.String(required=required)
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field["is_required"] is expected
 
@@ -66,7 +66,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             name = ma.fields.String(allow_none=allow_none)
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field["is_nullable"] is expected
 
@@ -75,7 +75,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             password = ma.fields.String(load_only=True)
 
-        result = Marshmallow3Parser(repository="svc").parse(MySchema)
+        result = MarshmallowParser(repository="svc").parse(MySchema)
         field = result.to_dict()["fields"][0]
 
         assert field == {
@@ -92,7 +92,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             created_at = ma.fields.String(dump_only=True)
 
-        result = Marshmallow3Parser(repository="svc").parse(MySchema)
+        result = MarshmallowParser(repository="svc").parse(MySchema)
         field = result.to_dict()["fields"][0]
 
         assert field == {
@@ -109,7 +109,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             order_id = ma.fields.String(data_key="orderId")
 
-        result = Marshmallow3Parser(repository="svc").parse(MySchema)
+        result = MarshmallowParser(repository="svc").parse(MySchema)
         field = result.to_dict()["fields"][0]
 
         assert field["name"] == "orderId"
@@ -119,7 +119,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             is_active = ma.fields.String(load_default="test_value")
 
-        result = Marshmallow3Parser(repository="svc").parse(MySchema)
+        result = MarshmallowParser(repository="svc").parse(MySchema)
         field = result.to_dict()["fields"][0]
 
         assert field["metadata"]["load_default"] == "test_value"
@@ -129,7 +129,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             status = ma.fields.String(dump_default="test_value")
 
-        result = Marshmallow3Parser(repository="svc").parse(MySchema)
+        result = MarshmallowParser(repository="svc").parse(MySchema)
         field = result.to_dict()["fields"][0]
 
         assert field["metadata"]["dump_default"] == "test_value"
@@ -145,7 +145,7 @@ class TestMarshmallow3Parser:
             f_string = ma.fields.String()
             f_raw = ma.fields.Raw()
 
-        assert Marshmallow3Parser(repository="svc").parse(SimpleSchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(SimpleSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -224,7 +224,7 @@ class TestMarshmallow3Parser:
             f_enum = ma.fields.Enum(_Color)
 
         _s = {"is_required": False, "is_nullable": False, "is_supported": True}
-        assert Marshmallow3Parser(repository="svc").parse(FormattedSchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(FormattedSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -302,7 +302,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             mystery = _Unrecognised()
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -329,7 +329,7 @@ class TestMarshmallow3Parser:
             bool_const = ma.fields.Constant(True)
 
         _s = {"is_required": False, "is_nullable": False, "is_supported": True}
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -352,7 +352,7 @@ class TestMarshmallow3Parser:
         class PersonSchema(ma.Schema):
             address = ma.fields.Nested(AddressSchema, required=True)
 
-        assert Marshmallow3Parser(repository="svc").parse(PersonSchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(PersonSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -394,7 +394,7 @@ class TestMarshmallow3Parser:
         class EventSchema(ma.Schema):
             tags = ma.fields.Nested(TagSchema, many=True)
 
-        assert Marshmallow3Parser(repository="svc").parse(EventSchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(EventSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -432,7 +432,7 @@ class TestMarshmallow3Parser:
         class EventSchema(ma.Schema):
             tags = ma.fields.Nested(TagsSchema)
 
-        assert Marshmallow3Parser(repository="svc").parse(EventSchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(EventSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -469,7 +469,7 @@ class TestMarshmallow3Parser:
         class PersonSchema(ma.Schema):
             address = ma.fields.Nested(AddressSchema, only=["city"])
 
-        assert Marshmallow3Parser(repository="svc").parse(PersonSchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(PersonSchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -501,7 +501,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             tags = ma.fields.List(ma.fields.String())
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -527,7 +527,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             tags = ma.fields.List(ma.fields.Nested(TagSchema))
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -559,7 +559,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             scores = ma.fields.Dict(keys=ma.fields.String(), values=ma.fields.Integer())
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -585,7 +585,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             inventory = ma.fields.Dict(keys=ma.fields.String(), values=ma.fields.Nested(ItemSchema))
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -618,7 +618,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             coords = ma.fields.Tuple(tuple_fields=(ma.fields.Float(), ma.fields.Float()))
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -643,7 +643,7 @@ class TestMarshmallow3Parser:
             def get_full_name(self, obj: object) -> str:
                 return str(obj)
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -666,7 +666,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             label = ma.fields.Function(lambda obj: str(obj))
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -689,7 +689,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             color = ma.fields.Enum(_Color)
 
-        assert Marshmallow3Parser(repository="svc").parse(MySchema).to_dict() == {
+        assert MarshmallowParser(repository="svc").parse(MySchema).to_dict() == {
             "topic": "t",
             "role": "producer",
             "repository": "svc",
@@ -712,7 +712,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             username = ma.fields.String(validate=mv.Length(min=1, max=10))
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "username",
@@ -728,7 +728,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             pin = ma.fields.String(validate=mv.Length(equal=5))
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "pin",
@@ -744,7 +744,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             score = ma.fields.Integer(validate=mv.Range(min=0, max=100))
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "score",
@@ -762,7 +762,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             code = ma.fields.String(validate=mv.Regexp(r"^\d+$"))
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "code",
@@ -778,7 +778,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             status = ma.fields.String(validate=mv.OneOf(["active", "inactive"]))
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "status",
@@ -794,7 +794,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             code = ma.fields.String(validate=mv.And(mv.Length(min=1), mv.Regexp(r"^\d+$")))
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "code",
@@ -810,7 +810,7 @@ class TestMarshmallow3Parser:
         class MySchema(ma.Schema):
             created_at = ma.fields.DateTime(format="iso")
 
-        field = Marshmallow3Parser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
 
         assert field == {
             "name": "created_at",

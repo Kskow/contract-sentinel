@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any
 
+from contract_sentinel.adapters.schema_parsers.parser import (
+    ResolvedFieldType,
+    SchemaParser,
+    TypeMapEntry,
+)
 from contract_sentinel.domain.schema import (
     ContractField,
     ContractSchema,
@@ -11,57 +15,16 @@ from contract_sentinel.domain.schema import (
 
 if TYPE_CHECKING:
     import types
-    from collections.abc import Callable
 
     import marshmallow.fields as mmf
 
 
-class _ResolvedFieldType(NamedTuple):
-    # Core — always set
-    type: str
-    format: str | None
-    is_supported: bool = True
-    # Object / array-of-objects — set by _resolve_nested, _resolve_list, _resolve_dict
-    fields: list[ContractField] | None = None
-    unknown: UnknownFieldBehaviour | None = None
-    # Array of primitives — set by _resolve_list
-    item_type: str | None = None
-    # Dict/Mapping — set by _resolve_dict
-    key_type: str | None = None
-    value_type: str | None = None
-
-
-class _TypeMapEntry(NamedTuple):
-    field_class: type
-    json_type: str
-    format: str | None = None
-    is_supported: bool = True
-    resolver: Callable[..., _ResolvedFieldType] | None = None
-
-
-class SchemaParser(ABC):
-    """Abstract parser that converts a decorated schema class into a ContractSchema.
-
-    Each framework implementation (Marshmallow, Pydantic, …) subclasses this.
-    The service layer calls ``parse`` without knowing which framework is in use.
-    """
-
-    @abstractmethod
-    def parse(self, cls: type) -> ContractSchema:
-        """Introspect *cls* and return its canonical ContractSchema representation."""
-        ...
-
-
-class Marshmallow3Parser(SchemaParser):
-    """SchemaParser backed by Marshmallow 3.x.
-
-    marshmallow is imported once in ``__init__`` so this module loads safely
-    without the marshmallow optional extra installed — the import only runs
-    when the parser is actually constructed.
-    """
+class MarshmallowParser(SchemaParser):
+    """SchemaParser backed by Marshmallow (3.x and 4.x)."""
 
     def __init__(self, repository: str) -> None:
         import marshmallow
+        import marshmallow.validate
 
         self._repository = repository
         self._ma: types.ModuleType = marshmallow
@@ -71,51 +34,51 @@ class Marshmallow3Parser(SchemaParser):
         # Entries with a resolver delegate inner-type introspection to a dedicated method.
         # Entries with is_supported=False are recognised but not introspected — the report
         # will note that the tool cannot validate the inner structure of these types.
-        self._type_map: list[_TypeMapEntry] = [
+        self._type_map: list[TypeMapEntry] = [
             # DateTime family — ISO strings; subclasses before the DateTime catch-all
-            _TypeMapEntry(marshmallow.fields.NaiveDateTime, "string", "date-time"),
-            _TypeMapEntry(marshmallow.fields.AwareDateTime, "string", "date-time"),
-            _TypeMapEntry(marshmallow.fields.Time, "string", "time"),
-            _TypeMapEntry(marshmallow.fields.Date, "string", "date"),
-            _TypeMapEntry(marshmallow.fields.DateTime, "string", "date-time"),
+            TypeMapEntry(marshmallow.fields.NaiveDateTime, "string", "date-time"),
+            TypeMapEntry(marshmallow.fields.AwareDateTime, "string", "date-time"),
+            TypeMapEntry(marshmallow.fields.Time, "string", "time"),
+            TypeMapEntry(marshmallow.fields.Date, "string", "date"),
+            TypeMapEntry(marshmallow.fields.DateTime, "string", "date-time"),
             # Temporal duration — marshmallow dumps as total_seconds() (a number)
-            _TypeMapEntry(marshmallow.fields.TimeDelta, "number"),
+            TypeMapEntry(marshmallow.fields.TimeDelta, "number"),
             # Numeric
-            _TypeMapEntry(marshmallow.fields.Integer, "integer"),
-            _TypeMapEntry(marshmallow.fields.Float, "number"),
-            _TypeMapEntry(marshmallow.fields.Decimal, "number"),
+            TypeMapEntry(marshmallow.fields.Integer, "integer"),
+            TypeMapEntry(marshmallow.fields.Float, "number"),
+            TypeMapEntry(marshmallow.fields.Decimal, "number"),
             # Boolean
-            _TypeMapEntry(marshmallow.fields.Boolean, "boolean"),
+            TypeMapEntry(marshmallow.fields.Boolean, "boolean"),
             # Collections — Dict before Mapping (subclass); Nested and List have resolvers;
             # Tuple is positional + heterogeneous with no JSON Schema equivalent.
-            _TypeMapEntry(marshmallow.fields.Nested, "object", resolver=self._resolve_nested),
-            _TypeMapEntry(marshmallow.fields.List, "array", resolver=self._resolve_list),
-            _TypeMapEntry(marshmallow.fields.Dict, "object", resolver=self._resolve_dict),
-            _TypeMapEntry(marshmallow.fields.Mapping, "object", resolver=self._resolve_dict),
-            _TypeMapEntry(marshmallow.fields.Tuple, "array", is_supported=False),
+            TypeMapEntry(marshmallow.fields.Nested, "object", resolver=self._resolve_nested),
+            TypeMapEntry(marshmallow.fields.List, "array", resolver=self._resolve_list),
+            TypeMapEntry(marshmallow.fields.Dict, "object", resolver=self._resolve_dict),
+            TypeMapEntry(marshmallow.fields.Mapping, "object", resolver=self._resolve_dict),
+            TypeMapEntry(marshmallow.fields.Tuple, "array", is_supported=False),
             # Enum — string with a restricted value set; "enum" format signals enum semantics
-            _TypeMapEntry(marshmallow.fields.Enum, "string", "enum"),
+            TypeMapEntry(marshmallow.fields.Enum, "string", "enum"),
             # String subclasses with semantic formats — most specific first.
             # All are plain strings on the wire but carry application-layer meaning;
             # a producer/consumer format mismatch is caught by MetadataMismatchRule.
-            _TypeMapEntry(marshmallow.fields.Email, "string", "email"),
-            _TypeMapEntry(marshmallow.fields.URL, "string", "uri"),
-            _TypeMapEntry(marshmallow.fields.UUID, "string", "uuid"),
-            _TypeMapEntry(marshmallow.fields.IPv4Interface, "string", "ipv4interface"),
-            _TypeMapEntry(marshmallow.fields.IPv6Interface, "string", "ipv6interface"),
-            _TypeMapEntry(marshmallow.fields.IPInterface, "string", "ipinterface"),
-            _TypeMapEntry(marshmallow.fields.IPv4, "string", "ipv4"),
-            _TypeMapEntry(marshmallow.fields.IPv6, "string", "ipv6"),
-            _TypeMapEntry(marshmallow.fields.IP, "string", "ip"),
+            TypeMapEntry(marshmallow.fields.Email, "string", "email"),
+            TypeMapEntry(marshmallow.fields.URL, "string", "uri"),
+            TypeMapEntry(marshmallow.fields.UUID, "string", "uuid"),
+            TypeMapEntry(marshmallow.fields.IPv4Interface, "string", "ipv4interface"),
+            TypeMapEntry(marshmallow.fields.IPv6Interface, "string", "ipv6interface"),
+            TypeMapEntry(marshmallow.fields.IPInterface, "string", "ipinterface"),
+            TypeMapEntry(marshmallow.fields.IPv4, "string", "ipv4"),
+            TypeMapEntry(marshmallow.fields.IPv6, "string", "ipv6"),
+            TypeMapEntry(marshmallow.fields.IP, "string", "ip"),
             # Plain string — catch-all for any remaining String subclass
-            _TypeMapEntry(marshmallow.fields.String, "string"),
+            TypeMapEntry(marshmallow.fields.String, "string"),
             # Raw — schema-less pass-through; any value is valid on the wire
-            _TypeMapEntry(marshmallow.fields.Raw, "any"),
+            TypeMapEntry(marshmallow.fields.Raw, "any"),
             # Constant — always emits the same literal; type is inferred from the Python value
-            _TypeMapEntry(marshmallow.fields.Constant, "any", resolver=self._resolve_constant),
+            TypeMapEntry(marshmallow.fields.Constant, "any", resolver=self._resolve_constant),
             # Computed fields — output type is determined at runtime, not statically inspectable
-            _TypeMapEntry(marshmallow.fields.Method, "string", is_supported=False),
-            _TypeMapEntry(marshmallow.fields.Function, "string", is_supported=False),
+            TypeMapEntry(marshmallow.fields.Method, "string", is_supported=False),
+            TypeMapEntry(marshmallow.fields.Function, "string", is_supported=False),
         ]
         self._unknown_map: dict[str, UnknownFieldBehaviour] = {
             marshmallow.RAISE: UnknownFieldBehaviour.FORBID,
@@ -158,7 +121,7 @@ class Marshmallow3Parser(SchemaParser):
             metadata=metadata if metadata else None,
         )
 
-    def _build_metadata(self, field: mmf.Field, resolved: _ResolvedFieldType) -> dict[str, Any]:
+    def _build_metadata(self, field: mmf.Field, resolved: ResolvedFieldType) -> dict[str, Any]:
         metadata: dict[str, Any] = {}
 
         if resolved.format is not None:
@@ -196,38 +159,38 @@ class Marshmallow3Parser(SchemaParser):
 
         return metadata
 
-    def _resolve_type(self, field: mmf.Field) -> _ResolvedFieldType:
+    def _resolve_type(self, field: mmf.Field) -> ResolvedFieldType:
         for entry in self._type_map:
             if isinstance(field, entry.field_class):
                 if not entry.is_supported:
-                    return _ResolvedFieldType(entry.json_type, entry.format, is_supported=False)
+                    return ResolvedFieldType(entry.json_type, entry.format, is_supported=False)
                 if entry.resolver is not None:
                     return entry.resolver(field)
-                return _ResolvedFieldType(entry.json_type, entry.format)
+                return ResolvedFieldType(entry.json_type, entry.format)
 
         # Unknown field type — class name as a format hint so metadata-level
         # diffing still catches mismatches between exotic types.
         # Marked unsupported: the tool cannot reason about the inner structure.
-        return _ResolvedFieldType("string", type(field).__name__.lower(), is_supported=False)
+        return ResolvedFieldType("string", type(field).__name__.lower(), is_supported=False)
 
-    def _resolve_nested(self, field: mmf.Nested) -> _ResolvedFieldType:
+    def _resolve_nested(self, field: mmf.Nested) -> ResolvedFieldType:
         nested_schema: Any = field.schema
         nested_fields = [self._parse_field(name, f) for name, f in nested_schema.fields.items()]
         field_type = "array" if field.many else "object"
-        return _ResolvedFieldType(
+        return ResolvedFieldType(
             field_type, None, fields=nested_fields, unknown=self._map_unknown(nested_schema.unknown)
         )
 
-    def _resolve_list(self, field: mmf.List) -> _ResolvedFieldType:
+    def _resolve_list(self, field: mmf.List) -> ResolvedFieldType:
         inner_resolved = self._resolve_type(field.inner)
         if inner_resolved.fields is not None:
             # List of nested objects — carry the inner schema structure through
-            return _ResolvedFieldType(
+            return ResolvedFieldType(
                 "array", None, fields=inner_resolved.fields, unknown=inner_resolved.unknown
             )
-        return _ResolvedFieldType("array", None, item_type=inner_resolved.type)
+        return ResolvedFieldType("array", None, item_type=inner_resolved.type)
 
-    def _resolve_constant(self, field: mmf.Constant) -> _ResolvedFieldType:
+    def _resolve_constant(self, field: mmf.Constant) -> ResolvedFieldType:
         # Cases are evaluated top-to-bottom, so bool is safely matched before int
         # (bool is a subclass of int in Python).
         match field.constant:
@@ -245,9 +208,9 @@ class Marshmallow3Parser(SchemaParser):
                 json_type = "object"
             case _:
                 json_type = "any"
-        return _ResolvedFieldType(json_type, None)
+        return ResolvedFieldType(json_type, None)
 
-    def _resolve_dict(self, field: mmf.Dict) -> _ResolvedFieldType:
+    def _resolve_dict(self, field: mmf.Dict) -> ResolvedFieldType:
         key_type: str | None = None
         value_type: str | None = None
         value_fields: list[ContractField] | None = None
@@ -264,7 +227,7 @@ class Marshmallow3Parser(SchemaParser):
             else:
                 value_type = value_resolved.type
 
-        return _ResolvedFieldType(
+        return ResolvedFieldType(
             "object",
             None,
             fields=value_fields,
