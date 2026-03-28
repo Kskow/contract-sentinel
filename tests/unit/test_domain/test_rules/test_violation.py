@@ -1,10 +1,11 @@
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 
 class TestViolation:
     def test_to_dict_serialises_all_fields(self) -> None:
         violation = Violation(
-            rule="TYPE_MISMATCH",
+            rule=RuleName.TYPE_MISMATCH,
             severity="CRITICAL",
             field_path="order_id",
             producer={"type": "string"},

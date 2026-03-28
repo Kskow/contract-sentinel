@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.rules.rule import Rule
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.rule import Rule, RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class StructureMismatchRule(Rule):
         field_path = producer.name
         return [
             Violation(
-                rule="STRUCTURE_MISMATCH",
+                rule=RuleName.STRUCTURE_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"structure": "open_map"},
@@ -55,3 +56,14 @@ class StructureMismatchRule(Rule):
                 ),
             )
         ]
+
+    def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
+        path = violation.field_path
+        return FixSuggestion(
+            producer_suggestion=(
+                f"Replace the open map for field '{path}' with a fixed-schema nested object."
+            ),
+            consumer_suggestion=(
+                f"Replace the fixed-schema nested object for field '{path}' with an open map."
+            ),
+        )

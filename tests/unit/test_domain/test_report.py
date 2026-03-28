@@ -4,26 +4,70 @@ from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
     FixSuggestionsReport,
+    PairViolations,
     TopicFixSuggestions,
     ValidationReport,
     ValidationStatus,
 )
-from contract_sentinel.domain.rules.engine import PairViolations
+from contract_sentinel.domain.rules.rule import RuleName
 from tests.unit.helpers import create_violation
 
 _CRITICAL_VIOLATION = create_violation(
-    "TYPE_MISMATCH",
+    RuleName.TYPE_MISMATCH,
     field_path="id",
     producer={"type": "string"},
     consumer={"type": "integer"},
     message="Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.",
 )
 _WARNING_VIOLATION = create_violation(
-    "COUNTERPART_MISMATCH",
+    RuleName.COUNTERPART_MISMATCH,
     severity="WARNING",
     field_path="",
     message="Topic 'orders' has 1 producer(s) but no matching consumer.",
 )
+
+
+class TestPairViolationsToDict:
+    def test_serialises_producer_consumer_ids_and_violations(self) -> None:
+        violation = create_violation(RuleName.TYPE_MISMATCH)
+        pair = PairViolations(
+            producer_id="orders-service/OrderSchema",
+            consumer_id="checkout-service/OrderConsumerSchema",
+            violations=[violation],
+        )
+
+        assert pair.to_dict() == {
+            "producer_id": "orders-service/OrderSchema",
+            "consumer_id": "checkout-service/OrderConsumerSchema",
+            "violations": [violation.to_dict()],
+        }
+
+    def test_serialises_empty_violations(self) -> None:
+        pair = PairViolations(
+            producer_id="orders-service/OrderSchema",
+            consumer_id="checkout-service/OrderConsumerSchema",
+            violations=[],
+        )
+
+        assert pair.to_dict() == {
+            "producer_id": "orders-service/OrderSchema",
+            "consumer_id": "checkout-service/OrderConsumerSchema",
+            "violations": [],
+        }
+
+    def test_serialises_none_ids_for_lonely_schema(self) -> None:
+        violation = create_violation(RuleName.TYPE_MISMATCH)
+        pair = PairViolations(
+            producer_id="orders-service/OrderSchema",
+            consumer_id=None,
+            violations=[violation],
+        )
+
+        assert pair.to_dict() == {
+            "producer_id": "orders-service/OrderSchema",
+            "consumer_id": None,
+            "violations": [violation.to_dict()],
+        }
 
 
 class TestValidationStatus:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.rules.rule import Rule
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.rule import Rule, RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 if TYPE_CHECKING:
@@ -23,7 +24,7 @@ class TypeMismatchRule(Rule):
         field_path = producer.name
         return [
             Violation(
-                rule="TYPE_MISMATCH",
+                rule=RuleName.TYPE_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"type": producer.type},
@@ -34,3 +35,16 @@ class TypeMismatchRule(Rule):
                 ),
             )
         ]
+
+    def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
+        path = violation.field_path
+        return FixSuggestion(
+            producer_suggestion=(
+                f"Change the type of field '{path}'"
+                f" from '{violation.producer['type']}' to '{violation.consumer['type']}'."
+            ),
+            consumer_suggestion=(
+                f"Change the type of field '{path}'"
+                f" from '{violation.consumer['type']}' to '{violation.producer['type']}'."
+            ),
+        )

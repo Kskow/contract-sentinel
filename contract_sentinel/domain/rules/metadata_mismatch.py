@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from contract_sentinel.domain.rules.rule import Rule
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.rule import Rule, RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 if TYPE_CHECKING:
@@ -62,7 +63,7 @@ class MetadataMismatchRule(Rule):
         if producer_values is None:
             return [
                 Violation(
-                    rule="METADATA_ALLOWED_VALUES_MISMATCH",
+                    rule=RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
                     severity="CRITICAL",
                     field_path=field_path,
                     producer={"allowed_values": None},
@@ -81,7 +82,7 @@ class MetadataMismatchRule(Rule):
 
         return [
             Violation(
-                rule="METADATA_ALLOWED_VALUES_MISMATCH",
+                rule=RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={"allowed_values": producer_values},
@@ -102,7 +103,7 @@ class MetadataMismatchRule(Rule):
         if p_range is None:
             return [
                 Violation(
-                    rule="METADATA_RANGE_MISMATCH",
+                    rule=RuleName.METADATA_RANGE_MISMATCH,
                     severity="CRITICAL",
                     field_path=field_path,
                     producer={"range": None},
@@ -124,7 +125,7 @@ class MetadataMismatchRule(Rule):
             if p_min is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_RANGE_MISMATCH",
+                        rule=RuleName.METADATA_RANGE_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"range": p_range},
@@ -142,7 +143,7 @@ class MetadataMismatchRule(Rule):
                 if p_min < c_min or (p_min == c_min and p_min_incl and not c_min_incl):
                     violations.append(
                         Violation(
-                            rule="METADATA_RANGE_MISMATCH",
+                            rule=RuleName.METADATA_RANGE_MISMATCH,
                             severity="CRITICAL",
                             field_path=field_path,
                             producer={"range": p_range},
@@ -164,7 +165,7 @@ class MetadataMismatchRule(Rule):
             if p_max is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_RANGE_MISMATCH",
+                        rule=RuleName.METADATA_RANGE_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"range": p_range},
@@ -182,7 +183,7 @@ class MetadataMismatchRule(Rule):
                 if p_max > c_max or (p_max == c_max and p_max_incl and not c_max_incl):
                     violations.append(
                         Violation(
-                            rule="METADATA_RANGE_MISMATCH",
+                            rule=RuleName.METADATA_RANGE_MISMATCH,
                             severity="CRITICAL",
                             field_path=field_path,
                             producer={"range": p_range},
@@ -208,7 +209,7 @@ class MetadataMismatchRule(Rule):
         if p_length is None:
             return [
                 Violation(
-                    rule="METADATA_LENGTH_MISMATCH",
+                    rule=RuleName.METADATA_LENGTH_MISMATCH,
                     severity="CRITICAL",
                     field_path=field_path,
                     producer={"length": None},
@@ -232,7 +233,7 @@ class MetadataMismatchRule(Rule):
             if p_min is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -247,7 +248,7 @@ class MetadataMismatchRule(Rule):
             elif p_min < c_min:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -264,7 +265,7 @@ class MetadataMismatchRule(Rule):
             if p_max is None:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -279,7 +280,7 @@ class MetadataMismatchRule(Rule):
             elif p_max > c_max:
                 violations.append(
                     Violation(
-                        rule="METADATA_LENGTH_MISMATCH",
+                        rule=RuleName.METADATA_LENGTH_MISMATCH,
                         severity="CRITICAL",
                         field_path=field_path,
                         producer={"length": p_length},
@@ -293,6 +294,65 @@ class MetadataMismatchRule(Rule):
                 )
 
         return violations
+
+    def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
+        path = violation.field_path
+        producer = violation.producer
+        consumer = violation.consumer
+        match violation.rule:
+            case RuleName.METADATA_ALLOWED_VALUES_MISMATCH:
+                if producer.get("allowed_values") is None:
+                    producer_instruction = (
+                        f"Add an allowed-values constraint to field '{path}'"
+                        f" whose values are a subset of {consumer['allowed_values']}."
+                    )
+                else:
+                    producer_instruction = (
+                        f"Restrict the allowed values for field '{path}'"
+                        f" to {consumer['allowed_values']}."
+                    )
+                return FixSuggestion(
+                    producer_suggestion=producer_instruction,
+                    consumer_suggestion=(
+                        f"Expand the allowed values for field '{path}'"
+                        f" to include {producer['allowed_values']}."
+                    ),
+                )
+            case RuleName.METADATA_RANGE_MISMATCH:
+                return FixSuggestion(
+                    producer_suggestion=(
+                        f"Tighten the range constraint on field '{path}'"
+                        f" to match the consumer: {consumer['range']}."
+                    ),
+                    consumer_suggestion=(
+                        f"Widen the range constraint on field '{path}'"
+                        f" to accept the producer's range: {producer['range']}."
+                    ),
+                )
+            case RuleName.METADATA_LENGTH_MISMATCH:
+                return FixSuggestion(
+                    producer_suggestion=(
+                        f"Tighten the length constraint on field '{path}'"
+                        f" to match the consumer: {consumer['length']}."
+                    ),
+                    consumer_suggestion=(
+                        f"Widen the length constraint on field '{path}'"
+                        f" to accept the producer's length: {producer['length']}."
+                    ),
+                )
+            case RuleName.METADATA_KEY_MISMATCH:
+                # Each dict carries exactly one key — the metadata attribute name.
+                key = next(iter(consumer))
+                return FixSuggestion(
+                    producer_suggestion=(
+                        f"Change metadata '{key}' on field '{path}' to '{consumer[key]}'."
+                    ),
+                    consumer_suggestion=(
+                        f"Change metadata '{key}' on field '{path}' to '{producer[key]}'."
+                    ),
+                )
+            case _:
+                return None
 
     def _check_key_mismatch(
         self,
@@ -310,7 +370,7 @@ class MetadataMismatchRule(Rule):
 
         return [
             Violation(
-                rule="METADATA_KEY_MISMATCH",
+                rule=RuleName.METADATA_KEY_MISMATCH,
                 severity="CRITICAL",
                 field_path=field_path,
                 producer={key: producer_value},

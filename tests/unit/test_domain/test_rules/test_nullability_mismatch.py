@@ -1,5 +1,7 @@
-from contract_sentinel.domain.rules import NullabilityMismatchRule
-from tests.unit.helpers import create_field
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.nullability_mismatch import NullabilityMismatchRule
+from contract_sentinel.domain.rules.rule import RuleName
+from tests.unit.helpers import create_field, create_violation
 
 
 class TestNullabilityMismatchRule:
@@ -41,3 +43,11 @@ class TestNullabilityMismatchRule:
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
         assert NullabilityMismatchRule().check(create_field(), None) == []
+
+    def test_suggest_fix_returns_nullable_instructions(self) -> None:
+        violation = create_violation(RuleName.NULLABILITY_MISMATCH, field_path="age")
+
+        assert NullabilityMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion="Remove the nullable constraint from field 'age'.",
+            consumer_suggestion="Mark field 'age' as nullable.",
+        )

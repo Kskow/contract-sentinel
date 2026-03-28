@@ -1,5 +1,7 @@
-from contract_sentinel.domain.rules import DirectionMismatchRule
-from tests.unit.helpers import create_field
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
+from contract_sentinel.domain.rules.rule import RuleName
+from tests.unit.helpers import create_field, create_violation
 
 
 class TestDirectionMismatchRule:
@@ -54,3 +56,17 @@ class TestDirectionMismatchRule:
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
         assert DirectionMismatchRule().check(create_field(), None) == []
+
+    def test_suggest_fix_returns_direction_instructions(self) -> None:
+        violation = create_violation(RuleName.DIRECTION_MISMATCH, field_path="token")
+
+        assert DirectionMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Ensure field 'token' is included in serialised output"
+                " (remove any output-exclusion flag)."
+            ),
+            consumer_suggestion=(
+                "Mark field 'token' as input-only,"
+                " or remove the expectation of receiving it from the producer."
+            ),
+        )

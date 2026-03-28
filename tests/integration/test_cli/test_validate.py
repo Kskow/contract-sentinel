@@ -13,10 +13,11 @@ from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
 from contract_sentinel.domain.report import (
     ContractReport,
     FixSuggestionsReport,
+    PairViolations,
     TopicFixSuggestions,
     ValidationReport,
 )
-from contract_sentinel.domain.rules.engine import PairViolations
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 from contract_sentinel.domain.schema import ContractField, ContractSchema, UnknownFieldBehaviour
 
@@ -121,7 +122,7 @@ class TestPrintReport:
                             consumer_id="test-repo/OrderConsumerSchema",
                             violations=[
                                 Violation(
-                                    rule="TYPE_MISMATCH",
+                                    rule=RuleName.TYPE_MISMATCH,
                                     severity="CRITICAL",
                                     field_path="id",
                                     producer={"type": "string"},
@@ -163,7 +164,7 @@ class TestPrintReport:
                             consumer_id="test-repo/OrderConsumerSchema",
                             violations=[
                                 Violation(
-                                    rule="TYPE_MISMATCH",
+                                    rule=RuleName.TYPE_MISMATCH,
                                     severity="CRITICAL",
                                     field_path="id",
                                     producer={"type": "string"},
@@ -174,7 +175,7 @@ class TestPrintReport:
                                     ),
                                 ),
                                 Violation(
-                                    rule="NULLABILITY_MISMATCH",
+                                    rule=RuleName.NULLABILITY_MISMATCH,
                                     severity="CRITICAL",
                                     field_path="name",
                                     producer={"is_nullable": True},
@@ -228,7 +229,7 @@ class TestPrintReport:
                             consumer_id="test-repo/PaymentConsumerSchema",
                             violations=[
                                 Violation(
-                                    rule="TYPE_MISMATCH",
+                                    rule=RuleName.TYPE_MISMATCH,
                                     severity="CRITICAL",
                                     field_path="id",
                                     producer={"type": "string"},

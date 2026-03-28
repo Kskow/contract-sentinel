@@ -10,10 +10,11 @@ from contract_sentinel.domain.fix_suggestions import (
 from contract_sentinel.domain.report import (
     ContractReport,
     FixSuggestionsReport,
+    PairViolations,
     TopicFixSuggestions,
     ValidationReport,
 )
-from contract_sentinel.domain.rules.engine import PairViolations
+from contract_sentinel.domain.rules.rule import RuleName
 from tests.unit.helpers import create_violation
 
 if TYPE_CHECKING:
@@ -38,12 +39,12 @@ class TestGenerateFixSuggestions:
         passing_pair = PairViolations(
             producer_id="svc-a/OrderSchema",
             consumer_id="svc-b/OrderConsumer",
-            violations=[create_violation("TYPE_MISMATCH", severity="WARNING")],
+            violations=[create_violation(RuleName.TYPE_MISMATCH, severity="WARNING")],
         )
         failing_pair = PairViolations(
             producer_id="svc-a/PaymentSchema",
             consumer_id="svc-b/PaymentConsumer",
-            violations=[create_violation("MISSING_FIELD", field_path="amount")],
+            violations=[create_violation(RuleName.MISSING_FIELD, field_path="amount")],
         )
         report = ValidationReport(
             contracts=[
@@ -80,7 +81,7 @@ class TestGenerateFixSuggestions:
         failing_pair = PairViolations(
             producer_id="svc-a/OrderSchema",
             consumer_id="svc-c/OrderConsumer",
-            violations=[create_violation("MISSING_FIELD", field_path="amount")],
+            violations=[create_violation(RuleName.MISSING_FIELD, field_path="amount")],
         )
         report = ValidationReport(
             contracts=[ContractReport(topic="orders", pairs=[passing_pair, failing_pair])]
@@ -111,13 +112,14 @@ class TestSuggestFixes:
         assert suggest_fixes(_pair([])) is None
 
     def test_returns_none_when_all_violations_are_non_critical(self) -> None:
-        assert suggest_fixes(_pair([create_violation("TYPE_MISMATCH", severity="WARNING")])) is None
+        violation = create_violation(RuleName.TYPE_MISMATCH, severity="WARNING")
+        assert suggest_fixes(_pair([violation])) is None
 
     def test_filters_out_non_critical_violations_and_only_processes_critical(self) -> None:
         pair = _pair(
             [
-                create_violation("TYPE_MISMATCH", severity="WARNING", field_path="ignored"),
-                create_violation("MISSING_FIELD", field_path="required_field"),
+                create_violation(RuleName.TYPE_MISMATCH, severity="WARNING", field_path="ignored"),
+                create_violation(RuleName.MISSING_FIELD, field_path="required_field"),
             ]
         )
 
@@ -134,9 +136,11 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "TYPE_MISMATCH", producer={"type": "String"}, consumer={"type": "Integer"}
+                    RuleName.TYPE_MISMATCH,
+                    producer={"type": "String"},
+                    consumer={"type": "Integer"},
                 ),
-                create_violation("MISSING_FIELD", field_path="other_field"),
+                create_violation(RuleName.MISSING_FIELD, field_path="other_field"),
             ]
         )
 
@@ -157,7 +161,9 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "TYPE_MISMATCH", producer={"type": "String"}, consumer={"type": "Integer"}
+                    RuleName.TYPE_MISMATCH,
+                    producer={"type": "String"},
+                    consumer={"type": "Integer"},
                 )
             ]
         )
@@ -174,7 +180,7 @@ class TestSuggestFixes:
         )
 
     def test_missing_field_instructions(self) -> None:
-        pair = _pair([create_violation("MISSING_FIELD", field_path="email")])
+        pair = _pair([create_violation(RuleName.MISSING_FIELD, field_path="email")])
 
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
@@ -186,7 +192,7 @@ class TestSuggestFixes:
         )
 
     def test_requirement_mismatch_instructions(self) -> None:
-        pair = _pair([create_violation("REQUIREMENT_MISMATCH", field_path="status")])
+        pair = _pair([create_violation(RuleName.REQUIREMENT_MISMATCH, field_path="status")])
 
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
@@ -198,7 +204,7 @@ class TestSuggestFixes:
         )
 
     def test_nullability_mismatch_instructions(self) -> None:
-        pair = _pair([create_violation("NULLABILITY_MISMATCH", field_path="age")])
+        pair = _pair([create_violation(RuleName.NULLABILITY_MISMATCH, field_path="age")])
 
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
@@ -208,7 +214,7 @@ class TestSuggestFixes:
         )
 
     def test_direction_mismatch_instructions(self) -> None:
-        pair = _pair([create_violation("DIRECTION_MISMATCH", field_path="token")])
+        pair = _pair([create_violation(RuleName.DIRECTION_MISMATCH, field_path="token")])
 
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
@@ -224,7 +230,7 @@ class TestSuggestFixes:
         )
 
     def test_structure_mismatch_instructions(self) -> None:
-        pair = _pair([create_violation("STRUCTURE_MISMATCH", field_path="metadata")])
+        pair = _pair([create_violation(RuleName.STRUCTURE_MISMATCH, field_path="metadata")])
 
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
@@ -238,7 +244,7 @@ class TestSuggestFixes:
         )
 
     def test_undeclared_field_instructions(self) -> None:
-        pair = _pair([create_violation("UNDECLARED_FIELD", field_path="extra_field")])
+        pair = _pair([create_violation(RuleName.UNDECLARED_FIELD, field_path="extra_field")])
 
         assert suggest_fixes(pair) == PairFixSuggestion(
             producer_id="repo-a/ProducerSchema",
@@ -259,7 +265,7 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "METADATA_ALLOWED_VALUES_MISMATCH",
+                    RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
                     field_path="category",
                     producer={"allowed_values": None},
                     consumer={"allowed_values": ["A", "B"]},
@@ -285,7 +291,7 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "METADATA_ALLOWED_VALUES_MISMATCH",
+                    RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
                     field_path="category",
                     producer={"allowed_values": ["A", "B", "C"]},
                     consumer={"allowed_values": ["A", "B"]},
@@ -308,7 +314,7 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "METADATA_RANGE_MISMATCH",
+                    RuleName.METADATA_RANGE_MISMATCH,
                     field_path="score",
                     producer={"range": (0, 1000)},
                     consumer={"range": (0, 100)},
@@ -332,7 +338,7 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "METADATA_LENGTH_MISMATCH",
+                    RuleName.METADATA_LENGTH_MISMATCH,
                     field_path="username",
                     producer={"length": (0, 500)},
                     consumer={"length": (0, 50)},
@@ -357,7 +363,7 @@ class TestSuggestFixes:
         pair = _pair(
             [
                 create_violation(
-                    "METADATA_KEY_MISMATCH",
+                    RuleName.METADATA_KEY_MISMATCH,
                     field_path="created_at",
                     producer={"format": "iso8601"},
                     consumer={"format": "timestamp"},

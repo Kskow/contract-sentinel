@@ -1,5 +1,7 @@
-from contract_sentinel.domain.rules import RequirementMismatchRule
-from tests.unit.helpers import create_field
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.requirement_mismatch import RequirementMismatchRule
+from contract_sentinel.domain.rules.rule import RuleName
+from tests.unit.helpers import create_field, create_violation
 
 
 class TestRequirementMismatchRule:
@@ -35,3 +37,13 @@ class TestRequirementMismatchRule:
 
     def test_returns_empty_when_consumer_is_none(self) -> None:
         assert RequirementMismatchRule().check(create_field(), None) == []
+
+    def test_suggest_fix_returns_mark_required_instructions(self) -> None:
+        violation = create_violation(RuleName.REQUIREMENT_MISMATCH, field_path="status")
+
+        assert RequirementMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion="Mark field 'status' as required.",
+            consumer_suggestion=(
+                "Add a 'load_default' to field 'status', or mark it as not required."
+            ),
+        )

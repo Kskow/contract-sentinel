@@ -6,12 +6,28 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from contract_sentinel.domain.fix_suggestions import PairFixSuggestion
-    from contract_sentinel.domain.rules.engine import PairViolations
+    from contract_sentinel.domain.rules.violation import Violation
 
 
 class ValidationStatus(StrEnum):
     PASSED = "PASSED"
     FAILED = "FAILED"
+
+
+@dataclasses.dataclass
+class PairViolations:
+    """Violations produced by a single producer/consumer pair."""
+
+    producer_id: str | None
+    consumer_id: str | None
+    violations: list[Violation]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "producer_id": self.producer_id,
+            "consumer_id": self.consumer_id,
+            "violations": [v.to_dict() for v in self.violations],
+        }
 
 
 @dataclasses.dataclass
@@ -57,6 +73,14 @@ class ValidationReport:
             "status": self.status,
             "contracts": [contract.to_dict() for contract in self.contracts],
         }
+
+
+@dataclasses.dataclass
+class FixSuggestion:
+    """Atomic fix unit — one per CRITICAL violation."""
+
+    producer_suggestion: str
+    consumer_suggestion: str
 
 
 @dataclasses.dataclass

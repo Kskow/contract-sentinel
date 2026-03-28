@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from contract_sentinel.domain.rules.rule import RuleName
 from contract_sentinel.domain.rules.violation import Violation
 
 if TYPE_CHECKING:
@@ -22,7 +23,7 @@ class CounterpartMismatchRule:
             first = consumers[0]
             violations.append(
                 Violation(
-                    rule="COUNTERPART_MISMATCH",
+                    rule=RuleName.COUNTERPART_MISMATCH,
                     severity="WARNING",
                     field_path="",
                     producer={},
@@ -39,7 +40,7 @@ class CounterpartMismatchRule:
             first = producers[0]
             violations.append(
                 Violation(
-                    rule="COUNTERPART_MISMATCH",
+                    rule=RuleName.COUNTERPART_MISMATCH,
                     severity="WARNING",
                     field_path="",
                     producer={},

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.rules import MetadataMismatchRule
-from tests.unit.helpers import create_field
+from contract_sentinel.domain.report import FixSuggestion
+from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
+from contract_sentinel.domain.rules.rule import RuleName
+from tests.unit.helpers import create_field, create_violation
 
 if TYPE_CHECKING:
     from contract_sentinel.domain.schema import ContractField
@@ -620,3 +622,88 @@ class TestMetadataMismatchRule:
                 " — Producer can emit values Consumer will reject."
             ),
         }
+
+    def test_suggest_fix_allowed_values_when_producer_unconstrained(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
+            field_path="status",
+            producer={"allowed_values": None},
+            consumer={"allowed_values": ["active", "inactive"]},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Add an allowed-values constraint to field 'status'"
+                " whose values are a subset of ['active', 'inactive']."
+            ),
+            consumer_suggestion=("Expand the allowed values for field 'status' to include None."),
+        )
+
+    def test_suggest_fix_allowed_values_when_producer_has_constraint(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_ALLOWED_VALUES_MISMATCH,
+            field_path="status",
+            producer={"allowed_values": ["active", "inactive", "deleted"]},
+            consumer={"allowed_values": ["active", "inactive"]},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Restrict the allowed values for field 'status' to ['active', 'inactive']."
+            ),
+            consumer_suggestion=(
+                "Expand the allowed values for field 'status'"
+                " to include ['active', 'inactive', 'deleted']."
+            ),
+        )
+
+    def test_suggest_fix_range_mismatch(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_RANGE_MISMATCH,
+            field_path="score",
+            producer={"range": {"min": 0, "max": 1000}},
+            consumer={"range": {"min": 0, "max": 100}},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Tighten the range constraint on field 'score'"
+                " to match the consumer: {'min': 0, 'max': 100}."
+            ),
+            consumer_suggestion=(
+                "Widen the range constraint on field 'score'"
+                " to accept the producer's range: {'min': 0, 'max': 1000}."
+            ),
+        )
+
+    def test_suggest_fix_length_mismatch(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_LENGTH_MISMATCH,
+            field_path="username",
+            producer={"length": {"min": 1, "max": 500}},
+            consumer={"length": {"min": 3, "max": 100}},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Tighten the length constraint on field 'username'"
+                " to match the consumer: {'min': 3, 'max': 100}."
+            ),
+            consumer_suggestion=(
+                "Widen the length constraint on field 'username'"
+                " to accept the producer's length: {'min': 1, 'max': 500}."
+            ),
+        )
+
+    def test_suggest_fix_key_mismatch(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_KEY_MISMATCH,
+            field_path="created_at",
+            producer={"format": "iso8601"},
+            consumer={"format": "timestamp"},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=("Change metadata 'format' on field 'created_at' to 'timestamp'."),
+            consumer_suggestion=("Change metadata 'format' on field 'created_at' to 'iso8601'."),
+        )
