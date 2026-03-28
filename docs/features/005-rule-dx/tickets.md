@@ -131,7 +131,7 @@ Gut `rules/__init__.py` down to an empty package marker, eliminating the second 
 - `tests/unit/test_domain/test_rules/test_violation.py` — same if it imports from the package level
 
 **Done when:**
-- [ ] `rules/__init__.py` contains no imports and no `__all__`
-- [ ] Every test file that previously imported from `contract_sentinel.domain.rules` now imports from the concrete module (e.g. `contract_sentinel.domain.rules.type_mismatch`)
-- [ ] No production file is broken (engine and fix_suggestions already import directly — verify with `just check`)
-- [ ] `just check` passes
+- [x] `rules/__init__.py` contains no imports and no `__all__`
+- [x] Every test file that previously imported from `contract_sentinel.domain.rules` now imports from the concrete module (e.g. `contract_sentinel.domain.rules.type_mismatch`)
+- [x] No production file is broken (engine and fix_suggestions already import directly — verify with `just check`)
+- [x] `just check` passes

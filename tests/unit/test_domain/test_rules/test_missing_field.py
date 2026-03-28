@@ -1,4 +1,4 @@
-from contract_sentinel.domain.rules import MissingFieldRule
+from contract_sentinel.domain.rules.missing_field import MissingFieldRule
 from tests.unit.helpers import create_field
 
 

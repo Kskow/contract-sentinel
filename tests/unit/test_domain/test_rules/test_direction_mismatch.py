@@ -1,4 +1,4 @@
-from contract_sentinel.domain.rules import DirectionMismatchRule
+from contract_sentinel.domain.rules.direction_mismatch import DirectionMismatchRule
 from tests.unit.helpers import create_field
 
 

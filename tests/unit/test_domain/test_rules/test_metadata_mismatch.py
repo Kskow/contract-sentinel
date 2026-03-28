@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from contract_sentinel.domain.rules import MetadataMismatchRule
+from contract_sentinel.domain.rules.metadata_mismatch import MetadataMismatchRule
 from tests.unit.helpers import create_field
 
 if TYPE_CHECKING:
