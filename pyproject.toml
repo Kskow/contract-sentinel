@@ -30,29 +30,17 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-n auto"
-markers = ["ma4: tests that require marshmallow 4"]
 
 [dependency-groups]
 dev = [
     "boto3>=1.42.70",
     "boto3-stubs[s3]>=1.42.70",
+    "marshmallow>=3.13,<5.0",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-xdist>=3.0",
     "ruff>=0.9",
     "ty>=0.0.0a1",
-]
-ma3 = [
-    "marshmallow>=3.13,<4.0",
-]
-ma4 = [
-    "marshmallow>=4.0,<5.0",
-]
-
-[tool.uv]
-default-groups = ["dev", "ma3"]
-conflicts = [
-    [{ group = "ma3" }, { group = "ma4" }],
 ]
 
 [tool.ruff]

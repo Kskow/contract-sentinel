@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from contract_sentinel.adapters.contract_store import S3ContractStore
-from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
+from contract_sentinel.adapters.schema_parsers.marshmallow import MarshmallowParser
 from contract_sentinel.config import Config
 from contract_sentinel.domain.errors import (
     MissingDependencyError,
@@ -22,12 +22,12 @@ class TestGetParser:
     def test_returns_marshmallow3_parser_for_marshmallow_framework(self) -> None:
         parser = get_parser(Framework.MARSHMALLOW, "my-service")
 
-        assert isinstance(parser, Marshmallow3Parser)
+        assert isinstance(parser, MarshmallowParser)
 
     def test_marshmallow_parser_carries_the_supplied_repository(self) -> None:
         parser = get_parser(Framework.MARSHMALLOW, "order-service")
 
-        assert isinstance(parser, Marshmallow3Parser)
+        assert isinstance(parser, MarshmallowParser)
         assert parser._repository == "order-service"
 
     def test_raises_unsupported_framework_error_with_descriptive_message(self) -> None:

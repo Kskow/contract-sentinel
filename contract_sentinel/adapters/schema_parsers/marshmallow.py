@@ -19,16 +19,12 @@ if TYPE_CHECKING:
     import marshmallow.fields as mmf
 
 
-class Marshmallow3Parser(SchemaParser):
-    """SchemaParser backed by Marshmallow 3.x.
-
-    marshmallow is imported once in ``__init__`` so this module loads safely
-    without the marshmallow optional extra installed — the import only runs
-    when the parser is actually constructed.
-    """
+class MarshmallowParser(SchemaParser):
+    """SchemaParser backed by Marshmallow (3.x and 4.x)."""
 
     def __init__(self, repository: str) -> None:
         import marshmallow
+        import marshmallow.validate
 
         self._repository = repository
         self._ma: types.ModuleType = marshmallow

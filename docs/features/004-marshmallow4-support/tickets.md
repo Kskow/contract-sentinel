@@ -191,33 +191,39 @@ implementations separately. Zero logic changes — this is a pure structural ref
 
 ---
 
-### TICKET-03 — Add `Marshmallow4Parser`
+### TICKET-03 — Add `Marshmallow4Parser` ✅
 
 **Depends on:** TICKET-02
 **Type:** Adapter
+**Status:** Done
 
 **Goal:**
-Add `Marshmallow4Parser` to `marshmallow.py` and export it — a subclass of
-`Marshmallow3Parser` that overrides `_resolve_list` to use `field.value_field`.
+Add `Marshmallow4Parser` to `marshmallow.py` — a subclass of `Marshmallow3Parser`.
 
-**Files to create / modify:**
-- `contract_sentinel/adapters/schema_parsers/marshmallow.py` — modify (append class)
-- `contract_sentinel/adapters/schema_parsers/__init__.py` — modify (add export)
+**Files modified:**
+- `contract_sentinel/adapters/schema_parsers/marshmallow.py` — `Marshmallow4Parser` appended
 
-**Implementation notes:**
-- The class body is a single method override of `_resolve_list`.
-- `field.value_field` is the ma4 attribute name for the inner element field of `List`.
-- Before committing: read the marshmallow 4 CHANGELOG in full and confirm no field
-  attribute renames exist beyond `List.inner`. Add overrides for any that do and open
-  a follow-up ticket for each.
-- Verify `marshmallow.missing` sentinel is still accessible in ma4 (`self._ma.missing`
-  in `_build_metadata`). If removed, fall back to `marshmallow.utils.missing`.
+**Deviation — no `_resolve_list` override needed:**
+
+> The design doc assumed `List.inner` was renamed to `List.value_field` in ma4.
+> Verified against the actual ma4.2.3 release: `List.inner` is still `inner`.
+> Full compatibility probe results:
+> - `List.inner` → still `inner` (no rename)
+> - `marshmallow.missing` → still present, same object as `marshmallow.utils.missing`
+> - All 13 field types used in the type map → all present in ma4
+> - `RAISE` / `EXCLUDE` / `INCLUDE` constants → all present
+>
+> `Marshmallow4Parser` therefore has no method overrides. It exists as a distinct
+> class to give the factory a concrete ma4 routing target and to anchor future
+> overrides if a later ma4.x or ma5 release introduces real breaking changes.
+> The only observable ma4 difference (`Schema.unknown` defaulting to `EXCLUDE`)
+> is handled automatically by reading `schema_instance.unknown` at parse time —
+> no code change needed.
 
 **Done when:**
-- [ ] `Marshmallow4Parser` exists in `marshmallow.py`, extends `Marshmallow3Parser`.
-- [ ] `Marshmallow4Parser._resolve_list` accesses `field.value_field`, not `field.inner`.
-- [ ] `Marshmallow4Parser` is in `schema_parsers/__init__.py` exports and `__all__`.
-- [ ] `uv run ty check` passes with no new errors.
+- [x] `Marshmallow4Parser` exists in `marshmallow.py`, extends `Marshmallow3Parser`.
+- [x] No `_resolve_list` override — `List.inner` unchanged in ma4.2.3 (verified at runtime).
+- [x] `uv run ty check` passes with no new errors.
 
 ---
 

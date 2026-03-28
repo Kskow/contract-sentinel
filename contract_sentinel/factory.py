@@ -19,10 +19,10 @@ def get_parser(framework: Framework, repository: str) -> SchemaParser:
     """Instantiate the parser adapter for the detected schema framework."""
     match framework:
         case Framework.MARSHMALLOW:
-            from contract_sentinel.adapters.schema_parsers.marshmallow import Marshmallow3Parser
+            from contract_sentinel.adapters.schema_parsers.marshmallow import MarshmallowParser
 
             try:
-                return Marshmallow3Parser(repository=repository)
+                return MarshmallowParser(repository=repository)
             except ImportError as exc:
                 raise MissingDependencyError(
                     "framework 'marshmallow' requires the marshmallow extra.\n"

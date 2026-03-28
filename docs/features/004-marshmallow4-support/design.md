@@ -5,13 +5,14 @@
 Only two marshmallow 4 changes require code modifications in Contract Sentinel.
 Everything else is either irrelevant to us or already handled.
 
-### Change 1 — `List.inner` renamed to `List.value_field`
+### Change 1 — `List.inner` renamed to `List.value_field` *(did not ship in ma4.2.3)*
 
-In marshmallow 3, the inner element field of a `List` is accessed via `field.inner`.
-In marshmallow 4 it is `field.value_field`, consistent with `Dict.value_field` and
-`Mapping.value_field` which already used that name in ma3.
+The design originally assumed `List.inner` was renamed to `List.value_field` in ma4.
+Verified against the actual ma4.2.3 release: `List.inner` is still `inner`. No override
+is needed in `Marshmallow4Parser`. This section should be revisited if a future ma4.x
+or ma5 release introduces the rename.
 
-**Affected code:** `Marshmallow3Parser._resolve_list` — single attribute access.
+**Affected code:** none.
 
 ### Change 2 — `Schema.unknown` default: `RAISE` → `EXCLUDE`
 
