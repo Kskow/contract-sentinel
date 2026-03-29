@@ -1,126 +1,131 @@
+[![PyPI version](https://img.shields.io/pypi/v/contract-sentinel)](https://pypi.org/project/contract-sentinel/)
+[![Python versions](https://img.shields.io/pypi/pyversions/contract-sentinel)](https://pypi.org/project/contract-sentinel/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/Kskow/contract-sentinel/actions/workflows/quality.yml/badge.svg)](https://github.com/Kskow/contract-sentinel/actions/workflows/quality.yml)
+
 # Contract Sentinel
 
-> **Status: Early Development** 🚧
-
-Contract Sentinel is an open-source contract testing tool for Python that **eliminates the need for a central broker**. It uses runtime introspection to extract schemas, your own cloud storage (S3) as the contract registry, and a Dual-Layer Validation strategy (Hard Diff + AI Semantic Audit) to catch breaking changes without blocking safe ones.
+Contract Sentinel is an open-source Python contract testing tool that **eliminates the need for a central broker**. It introspects your schema classes at runtime, stores contracts in your own S3 bucket, and runs a Hard Diff validation to distinguish safe schema changes from breaking ones — failing CI before a breaking change ever reaches production.
 
 ## Why Contract Sentinel?
 
 | Problem | Solution |
 |---|---|
-| Pact/Broker = vendor lock-in | You own your contracts — stored in your S3 |
+| Pact/Broker = vendor lock-in | You own your contracts — stored in your S3 bucket |
 | Schema drift goes undetected until prod | CI gate fails on breaking changes before merge |
-| AI false positives block safe changes | Hard Diff runs first; AI only invoked on real diffs |
-| Opaque validation rules | All Hard Diff logic is open source and auditable |
+| Opaque validation rules | All validation logic is open source and auditable |
 
 ## How It Works
 
 1. **Discover** — Sentinel scans for classes decorated with `@contract`
-2. **Compare** — Hard Diff compares local schema against the registry version
-3. **Audit** — If a structural difference is found, an LLM decides if it's a *breaking* change
+2. **Publish** — Parsed schemas are serialised and stored in your S3 bucket on merge to main
+3. **Compare** — Hard Diff compares the local schema against the published registry version on PR
 4. **Gate** — Exit `0` (safe) or `1` (breaking) drives your CI pass/fail
+
+## What's Supported
+
+| Concern | Supported | Planned |
+|---|---|---|
+| Schema frameworks | Marshmallow 3 & 4 | Pydantic, attrs, dataclasses |
+| Contract stores | AWS S3 | GCS, Azure Blob |
+| Validation | Hard Diff (deterministic) | AI Semantic Audit |
+
+## Installation
+
+```bash
+pip install contract-sentinel              # core only (no schema parser, no store)
+pip install contract-sentinel[marshmallow] # + marshmallow parser
+pip install contract-sentinel[s3]          # + S3 store
+pip install contract-sentinel[all]         # everything
+```
 
 ## Quickstart
 
-> **Prerequisites:** Docker Engine must be installed.
+### 1. Configure your project
 
-```bash
-# 1. Copy the env template
-cp .env.local .env
+Add a `[tool.sentinel]` table to your `pyproject.toml`. Non-secret config lives here — it's version-controlled alongside your code and automatically picked up by every `sentinel` command, so you never repeat it in CI:
 
-# 2. Start the local dev environment (app + LocalStack)
-just docker-up
-
-# 3. Open a shell inside the container
-just docker-shell
-
-# 4. Run the full quality gate (lint + format + types + tests)
-just check
+```toml
+[tool.sentinel]
+name      = "my-service"     # identifies your service in the contract registry
+s3_bucket = "my-contracts"   # S3 bucket where contracts are stored
+s3_path   = "contract_tests" # key prefix inside the bucket
 ```
 
-## Docker Commands
+Alternatively, all three can be set as environment variables using the `SENTINEL_` prefix: `SENTINEL_NAME`, `SENTINEL_S3_BUCKET`, `SENTINEL_S3_PATH`. `pyproject.toml` takes precedence when both are present.
 
-| Command | What it does |
-|---|---|
-| `just docker-up` | Start app + LocalStack in the background |
-| `just docker-down` | Stop all containers |
-| `just docker-shell` | Open an interactive shell inside the app container |
-| `just logs` | Tail all container logs |
-| `just docker-prune` | Stop everything and wipe all images, volumes, and build cache |
+AWS credentials are the only values that must be supplied separately (as CI secrets) since they must never appear in version-controlled files.
 
-## Project Structure
+### 2. Mark your schemas
 
-```
-contract_sentinel/
-├── domain/             # Pure business logic — no I/O, no infra imports
-│   ├── participant.py      # @contract decorator, Role enum, ContractMeta
-│   ├── schema.py           # ContractField, ContractSchema, UnknownFieldBehaviour
-│   ├── report.py           # ValidationReport, ContractReport
-│   ├── fix_suggestions.py  # FixSuggestion — human-readable remediation hints per violation
-│   ├── rules/
-│   │   ├── rule.py                   # Rule(ABC) — check(producer | None, consumer | None)
-│   │   ├── violation.py              # Violation dataclass
-│   │   ├── engine.py                 # validate_pair / validate_group — rule orchestration + recursion
-│   │   ├── type_mismatch.py
-│   │   ├── nullability_mismatch.py
-│   │   ├── requirement_mismatch.py
-│   │   ├── direction_mismatch.py
-│   │   ├── structure_mismatch.py
-│   │   ├── metadata_mismatch.py      # allowed_values, range, length + generic key checks
-│   │   ├── missing_field.py          # fires when producer is None
-│   │   ├── undeclared_field.py       # fires when consumer.unknown == FORBID
-│   │   └── counterpart_mismatch.py   # fires when a producer has no matching consumer (or vice versa)
-│   ├── framework.py    # Framework enum + detect_framework
-│   ├── loader.py       # load_marked_classes — filesystem scanner
-│   └── errors.py       # UnsupportedFrameworkError, UnsupportedStorageError, MissingDependencyError
-├── adapters/           # ABC + implementation(s) per concern
-│   ├── contract_store.py   # ContractStore(ABC) + S3ContractStore
-│   └── schema_parsers/     # SchemaParser(ABC) + MarshmallowParser (ma3 + ma4)
-│       ├── parser.py       #   SchemaParser ABC, ResolvedFieldType, TypeMapEntry
-│       └── marshmallow.py  #   MarshmallowParser
-├── services/           # Use-case orchestration
-│   ├── validate.py     # validate_local_contracts, validate_published_contracts
-│   └── publish.py      # publish_contracts — 3-phase (parse → write → prune), SHA-256 hash-gated
-├── cli/                # Typer CLI entrypoints (wired as `sentinel` script)
-│   ├── main.py         # Typer app entry-point
-│   ├── validate.py     # sentinel validate-local-contracts / sentinel validate-published-contracts
-│   └── publish.py      # sentinel publish-contracts
-├── config.py           # Pydantic-settings Config — all env vars in one place
-└── factory.py          # get_parser / get_store — wires framework + storage adapters
+Decorate your Marshmallow schemas with `@contract`, declaring the topic name and whether this service is the producer or consumer of that schema:
 
-tests/
-├── unit/
-│   ├── test_domain/     # Pure logic tests — mirrors contract_sentinel/domain/
-│   ├── test_services/   # Service use-case tests — unittest.mock stubs, no I/O
-│   └── test_cli/        # CLI unit tests — Typer CliRunner, no real infra
-└── integration/
-    ├── test_adapters/   # Adapter tests — LocalStack
-    └── test_cli/        # CLI integration tests — LocalStack
+```python
+from marshmallow import Schema, fields
+from contract_sentinel import contract, Role
+
+@contract(topic="orders", role=Role.PRODUCER)
+class OrderSchema(Schema):
+    id = fields.Integer(required=True)
+    status = fields.String(required=True)
+    amount = fields.Float(required=True)
 ```
 
-## Tech Stack
+### 3. Publish and validate on merge to main
 
-| Concern | Tool |
-|---|---|
-| Runtime | Python 3.12 |
-| Package manager | `uv` |
-| Linting & formatting | `ruff` |
-| Type checking | `ty` |
-| Testing | `pytest` + `pytest-xdist` |
-| Local AWS emulation | LocalStack |
-| Task runner | `just` |
-| CI | GitHub Actions |
+Add a job that runs after your tests pass on `main`. It publishes your updated schemas and then immediately validates all contracts in the registry — catching cross-service breakage the moment it lands:
 
-## CI
-
-Every push and pull request targeting `main` runs the full quality gate via GitHub Actions:
-
+```yaml
+publish-contracts:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - run: pip install contract-sentinel[all]
+    - run: sentinel publish-contracts
+      env:
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - run: sentinel validate-published-contracts
+      env:
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
-Lint → Format check → Type check → Test
+
+### 4. Validate on PR
+
+Add a job that runs on every pull request. It compares local schemas against the published contracts and fails if a breaking change is detected:
+
+```yaml
+validate-contracts:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - run: pip install contract-sentinel[all]
+    - run: sentinel validate-local-contracts
+      env:
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
-Each step is isolated so the PR UI shows exactly which gate failed.
+## CLI Reference
+
+| Command | Flag | Default | Description |
+|---|---|---|---|
+| `sentinel publish-contracts` | `--path` | `.` | Directory to scan for `@contract` classes |
+| | `--verbose` | off | Show unchanged schemas |
+| `sentinel validate-local-contracts` | `--path` | `.` | Directory to scan for `@contract` classes |
+| | `--dry-run` | off | Print report but always exit 0 |
+| | `--verbose` | off | Show passing contracts |
+| | `--how-to-fix` | off | Print copy-paste fix suggestions for each failing pair |
+| | `--markdown` | off | Format output as Markdown for use as a PR comment |
+| `sentinel validate-published-contracts` | `--dry-run` | off | Print report but always exit 0 |
+| | `--verbose` | off | Show passing contracts |
+| | `--how-to-fix` | off | Print copy-paste fix suggestions for each failing pair |
+| | `--markdown` | off | Format output as Markdown for use as a PR comment |
 
 ## Contributing
 
-See `docs/features/` for planned work. Each feature directory contains a `product_spec.md` and a `tickets.md` that is the source of truth for implementation tasks.
+See `contributors/contributing.md` for local setup instructions, the full `just` command reference, and the PR workflow. To extend the library — adding a new validation rule, schema parser, or contract store — see the how-to guides in the same directory.
