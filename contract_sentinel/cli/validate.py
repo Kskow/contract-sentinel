@@ -40,6 +40,10 @@ def validate_local_contracts(
         bool,
         typer.Option("--how-to-fix", help="Show copy-paste fix suggestions for each failing pair."),
     ] = False,
+    markdown: Annotated[
+        bool,
+        typer.Option("--markdown", help="Format output as Markdown for use as a PR comment."),
+    ] = False,
 ) -> None:
     """Validate local schemas against their published counterparts."""
     config = Config()
@@ -57,11 +61,11 @@ def validate_local_contracts(
 
     validation_report = service_validate_local_contracts(store, get_parser, loader, config)
 
-    print_validation_report(validation_report, verbose=verbose)
+    print_validation_report(validation_report, verbose, markdown)
 
     if how_to_fix:
         fix_suggestions_report = generate_fix_suggestions(validation_report)
-        print_fix_suggestions_report(fix_suggestions_report, local_name=config.name)
+        print_fix_suggestions_report(fix_suggestions_report, config.name, markdown)
 
     if not dry_run and validation_report.status == ValidationStatus.FAILED:
         raise typer.Exit(code=1)
@@ -80,66 +84,79 @@ def validate_published_contracts(
         bool,
         typer.Option("--how-to-fix", help="Show copy-paste fix suggestions for each failing pair."),
     ] = False,
+    markdown: Annotated[
+        bool,
+        typer.Option("--markdown", help="Format output as Markdown for use as a PR comment."),
+    ] = False,
 ) -> None:
     """Validate all published contracts against each other."""
     config = Config()
     store = get_store(config)
     report = service_validate_published_contracts(store)
 
-    print_validation_report(report, verbose=verbose)
+    print_validation_report(report, verbose, markdown)
 
     if how_to_fix:
         fix_suggestions_report = generate_fix_suggestions(report)
-        print_fix_suggestions_report(fix_suggestions_report, local_name=None)
+        print_fix_suggestions_report(fix_suggestions_report, None, markdown)
 
     if not dry_run and report.status == ValidationStatus.FAILED:
         raise typer.Exit(code=1)
 
 
-def print_validation_report(report: ValidationReport, *, verbose: bool = False) -> None:
+def print_validation_report(
+    report: ValidationReport, verbose: bool = False, markdown: bool = False
+) -> None:
     """Print a ValidationReport to stdout in a human-readable format."""
+    lines: list[str] = []
+
     header = f"\nContract Validation — {report.status}\n"
-    if report.status == ValidationStatus.FAILED:
+    if not markdown and report.status == ValidationStatus.FAILED:
         header = typer.style(header, fg=typer.colors.RED)
-    typer.echo(header)
+    lines.append(header)
+
     for contract_report in report.contracts:
         if not verbose and contract_report.status == ValidationStatus.PASSED:
             continue
 
         icon = "✓" if contract_report.status == ValidationStatus.PASSED else "✗"
         contract_line = f"  {icon}  {contract_report.topic}"
-        if contract_report.status == ValidationStatus.FAILED:
+        if not markdown and contract_report.status == ValidationStatus.FAILED:
             contract_line = typer.style(contract_line, fg=typer.colors.RED)
+        lines.append(contract_line)
 
-        typer.echo(contract_line)
         for pair in contract_report.pairs:
             if not verbose and not pair.violations:
                 continue
             producer = pair.producer_id or "(none)"
             consumer = pair.consumer_id or "(none)"
-            typer.echo(f"       {producer} vs {consumer}")
+            lines.append(f"       {producer} vs {consumer}")
             for violation in pair.violations:
-                typer.echo(
+                lines.append(
                     f"         [{violation.severity}] {violation.rule} @ {violation.field_path}"
                 )
-                typer.echo(f"         {violation.message}")
+                lines.append(f"         {violation.message}")
 
-    typer.echo("")
+    lines.append("")
+    _render_report(lines, markdown)
 
 
 def print_fix_suggestions_report(
-    suggestion_fix_report: FixSuggestionsReport, *, local_name: str | None
+    suggestion_fix_report: FixSuggestionsReport,
+    local_name: str | None,
+    markdown: bool = False,
 ) -> None:
     """Print a FixSuggestionsReport to stdout. No-op when there are no suggestions."""
     if not suggestion_fix_report.has_suggestions:
         return
 
-    typer.echo("\nFix Suggestions\n")
+    lines: list[str] = []
+    lines.append("\nFix Suggestions\n")
 
     for topic in suggestion_fix_report.suggestions:
-        typer.echo(f"  {topic.topic}")
+        lines.append(f"  {topic.topic}")
         for pair in topic.pairs:
-            typer.echo(f"\n       {pair.producer_id} vs {pair.consumer_id}\n")
+            lines.append(f"\n       {pair.producer_id} vs {pair.consumer_id}\n")
 
             if local_name is not None and pair.producer_id.startswith(local_name + "/"):
                 producer_label = "Fix on your side (Producer) — copy & paste to your agent:"
@@ -155,9 +172,21 @@ def print_fix_suggestions_report(
                 (producer_label, pair.producer_suggestions),
                 (consumer_label, pair.consumer_suggestions),
             ):
-                typer.echo(f"         {label}\n")
+                lines.append(f"         {label}\n")
                 for line in block.splitlines():
-                    typer.echo(f"           {line}" if line else "")
-                typer.echo("")
+                    lines.append(f"           {line}" if line else "")
+                lines.append("")
 
-    typer.echo("")
+    lines.append("")
+    _render_report(lines, markdown)
+
+
+def _render_report(lines: list[str], markdown: bool) -> None:
+    if markdown:
+        typer.echo("```")
+        for line in lines:
+            typer.echo(line)
+        typer.echo("```\n")
+    else:
+        for line in lines:
+            typer.echo(line)
