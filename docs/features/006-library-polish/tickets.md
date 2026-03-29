@@ -251,7 +251,7 @@ Content from the current README that must **not** appear in the new one:
 
 ---
 
-### TICKET-04 — `contributors/` directory
+### TICKET-04 — `contributors/` directory ✅
 
 **Depends on:** —
 **Type:** Docs
@@ -326,9 +326,9 @@ No content changes — this is a pure move.
 5. **Checklist** — a checkbox list mirroring the four steps above, plus `just check` passes.
 
 **Done when:**
-- [ ] `contributors/contributing.md` exists and contains the local setup sequence, full `just` table, PR workflow, and pointers to the three how-to guides
-- [ ] `contributors/how-to-add-a-rule.md` exists with the full content of the original `docs/how-to-add-a-rule.md`
-- [ ] `docs/how-to-add-a-rule.md` is deleted
-- [ ] `contributors/how-to-add-a-parser.md` exists and covers all five steps with a skeleton class and a checklist
-- [ ] `contributors/how-to-add-a-contract-store.md` exists and covers all four steps with method signatures and a checklist
-- [ ] No broken internal links (the README Contributing pointer and any cross-references between guides resolve correctly)
+- [x] `contributors/contributing.md` exists and contains the local setup sequence, full `just` table, PR workflow, and pointers to the three how-to guides
+- [x] `contributors/how-to-add-a-rule.md` exists with the full content of the original `docs/how-to-add-a-rule.md`
+- [x] `docs/how-to-add-a-rule.md` is deleted
+- [x] `contributors/how-to-add-a-parser.md` exists and covers all five steps with a skeleton class and a checklist
+- [x] `contributors/how-to-add-a-contract-store.md` exists and covers all four steps with method signatures and a checklist
+- [x] No broken internal links (the README Contributing pointer and any cross-references between guides resolve correctly)
