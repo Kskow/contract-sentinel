@@ -36,7 +36,7 @@ publish workflow, then the workflow, then the user-facing README, then contribut
 
 ## Tickets
 
-### TICKET-01 — `pyproject.toml` metadata + `LICENSE`
+### TICKET-01 — `pyproject.toml` metadata + `LICENSE` ✅
 
 **Depends on:** —
 **Type:** Infra
@@ -82,15 +82,15 @@ Issues     = "https://github.com/Kskow/contract-sentinel/issues"
 Standard MIT license text, copyright year `2026`, copyright holder `Kskow`.
 
 **Done when:**
-- [ ] `pyproject.toml` `version` field is `"0.0.1"`
-- [ ] `pyproject.toml` contains `readme`, `license`, `authors`, `keywords`, `classifiers`, and `[project.urls]` exactly as specified above
-- [ ] `LICENSE` exists at the repo root with MIT text, year 2026, holder Kskow
-- [ ] `uv build` completes without errors and produces `dist/contract_sentinel-0.0.1-py3-none-any.whl` and `dist/contract_sentinel-0.0.1.tar.gz`
-- [ ] `just check` still passes
+- [x] `pyproject.toml` `version` field is `"0.0.1"`
+- [x] `pyproject.toml` contains `readme`, `license`, `authors`, `keywords`, `classifiers`, and `[project.urls]` exactly as specified above
+- [x] `LICENSE` exists at the repo root with MIT text, year 2026, holder Kskow
+- [x] `uv build` completes without errors and produces `dist/contract_sentinel-0.0.1-py3-none-any.whl` and `dist/contract_sentinel-0.0.1.tar.gz`
+- [x] `just check` still passes
 
 ---
 
-### TICKET-02 — GitHub Actions publish workflow
+### TICKET-02 — GitHub Actions publish workflow ✅
 
 **Depends on:** TICKET-01 (version must be `0.0.1` before tagging)
 **Type:** Infra
@@ -164,16 +164,16 @@ git push origin v0.0.1
 ```
 
 **Done when:**
-- [ ] `.github/workflows/publish.yml` exists with the exact structure above
-- [ ] The workflow triggers only on `v*` tags (not on branch pushes or PRs)
-- [ ] `environment: pypi` and `id-token: write` permission are present
-- [ ] `uv-version` and `python-version` match `quality.yml`
+- [x] `.github/workflows/publish.yml` exists with the exact structure above
+- [x] The workflow triggers only on `v*` tags (not on branch pushes or PRs)
+- [x] `environment: pypi` and `id-token: write` permission are present
+- [x] `uv-version` and `python-version` match `quality.yml`
 - [ ] The one-time PyPI and GitHub Environment setup steps are completed
 - [ ] Pushing a `v0.0.1` tag causes the Actions workflow to run and the package appears on https://pypi.org/project/contract-sentinel/
 
 ---
 
-### TICKET-03 — README rewrite
+### TICKET-03 — README rewrite ✅
 
 **Depends on:** —
 **Type:** Docs
@@ -243,11 +243,11 @@ Content from the current README that must **not** appear in the new one:
 - CI section (the lint/format/type/test pipeline is implementation detail, not user-facing)
 
 **Done when:**
-- [ ] README opens with the four badges
-- [ ] All required sections are present: Why, How It Works, What's Supported, Installation, Quickstart, CLI Reference, Contributing
-- [ ] The Quickstart's publish and validate snippets are syntactically valid GitHub Actions YAML
-- [ ] No Docker commands, no `just` commands, no internal project structure tree
-- [ ] All links in the README resolve (badges point to correct URLs, contributing pointer is correct path)
+- [x] README opens with the four badges
+- [x] All required sections are present: Why, How It Works, What's Supported, Installation, Quickstart, CLI Reference, Contributing
+- [x] The Quickstart's publish and validate snippets are syntactically valid GitHub Actions YAML
+- [x] No Docker commands, no `just` commands, no internal project structure tree
+- [x] All links in the README resolve (badges point to correct URLs, contributing pointer is correct path)
 
 ---
 
