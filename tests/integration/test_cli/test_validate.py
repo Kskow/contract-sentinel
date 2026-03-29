@@ -271,6 +271,58 @@ class TestPrintReport:
 
         assert buf.getvalue() == ("\nContract Validation — PASSED\n\n\n")
 
+    def test_markdown_wraps_passed_report_in_fenced_block(self) -> None:
+        report = ValidationReport(contracts=[])
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_validation_report(report, markdown=True)
+
+        assert buf.getvalue() == "```\n\nContract Validation — PASSED\n\n\n```\n\n"
+
+    def test_markdown_wraps_failed_report_in_fenced_block(self) -> None:
+        report = ValidationReport(
+            contracts=[
+                ContractReport(
+                    topic="orders",
+                    pairs=[
+                        PairViolations(
+                            producer_id="orders-service/OrderProducerSchema",
+                            consumer_id="test-repo/OrderConsumerSchema",
+                            violations=[
+                                Violation(
+                                    rule=RuleName.TYPE_MISMATCH,
+                                    severity="CRITICAL",
+                                    field_path="id",
+                                    producer={"type": "string"},
+                                    consumer={"type": "integer"},
+                                    message=(
+                                        "Field 'id' is a 'string' in Producer"
+                                        " but Consumer expects a 'integer'."
+                                    ),
+                                )
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_validation_report(report, markdown=True)
+
+        assert buf.getvalue() == (
+            "```\n"
+            "\nContract Validation — FAILED\n\n"
+            "  ✗  orders\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+            "```\n\n"
+        )
+
 
 class TestValidateLocal:
     def test_passes_when_schemas_are_compatible(
@@ -357,6 +409,91 @@ class TestValidateLocal:
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
+        )
+
+    def test_markdown_flag_wraps_output_in_fenced_block(
+        self,
+        tmp_path: Path,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer())
+        (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
+
+        result = CliRunner().invoke(
+            app, ["validate-local-contracts", "--path", str(tmp_path), "--markdown"], env=cli_env
+        )
+
+        assert result.exit_code == 0
+        assert result.output == "```\n\nContract Validation — PASSED\n\n\n```\n\n"
+
+    def test_markdown_flag_produces_plain_output_without_ansi_on_failure(
+        self,
+        tmp_path: Path,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer(field_type="string"))
+        (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
+
+        # color=True forces click to preserve ANSI codes — verifies none slip through.
+        result = CliRunner().invoke(
+            app,
+            ["validate-local-contracts", "--path", str(tmp_path), "--markdown"],
+            env=cli_env,
+            color=True,
+        )
+
+        assert result.exit_code == 1
+        assert "\x1b" not in result.output
+        assert result.output == (
+            "```\n"
+            "\nContract Validation — FAILED\n\n"
+            "  ✗  orders\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+            "```\n\n"
+        )
+
+    def test_markdown_and_how_to_fix_produce_two_fenced_blocks(
+        self,
+        tmp_path: Path,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer(field_type="string"))
+        (tmp_path / "consumer.py").write_text(_LOCAL_CONSUMER_SRC)
+
+        result = CliRunner().invoke(
+            app,
+            ["validate-local-contracts", "--path", str(tmp_path), "--markdown", "--how-to-fix"],
+            env=cli_env,
+        )
+
+        assert result.exit_code == 1
+        assert result.output == (
+            "```\n"
+            "\nContract Validation — FAILED\n\n"
+            "  ✗  orders\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+            "```\n\n"
+            "```\n"
+            "\nFix Suggestions\n\n"
+            "  orders\n"
+            "\n       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n\n"
+            "         Fix on their side (Producer) — copy & paste to your agent:\n\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on your side (Consumer) — copy & paste to your agent:\n\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+            "```\n\n"
         )
 
     def test_how_to_fix_prints_fix_suggestions_after_validation_report(
@@ -470,6 +607,55 @@ class TestValidatePublished:
             "         [CRITICAL] TYPE_MISMATCH @ id\n"
             "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
             "\n"
+        )
+
+    def test_markdown_flag_wraps_output_in_fenced_block(
+        self,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer(), _consumer())
+
+        result = CliRunner().invoke(
+            app, ["validate-published-contracts", "--markdown"], env=cli_env
+        )
+
+        assert result.exit_code == 0
+        assert result.output == "```\n\nContract Validation — PASSED\n\n\n```\n\n"
+
+    def test_markdown_and_how_to_fix_produce_two_fenced_blocks(
+        self,
+        s3_store: S3ContractStore,
+        cli_env: dict[str, str],
+    ) -> None:
+        _seed(s3_store, _producer(field_type="string"), _consumer())
+
+        result = CliRunner().invoke(
+            app, ["validate-published-contracts", "--markdown", "--how-to-fix"], env=cli_env
+        )
+
+        assert result.exit_code == 1
+        assert result.output == (
+            "```\n"
+            "\nContract Validation — FAILED\n\n"
+            "  ✗  orders\n"
+            "       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n"
+            "         [CRITICAL] TYPE_MISMATCH @ id\n"
+            "         Field 'id' is a 'string' in Producer but Consumer expects a 'integer'.\n"
+            "\n"
+            "```\n\n"
+            "```\n"
+            "\nFix Suggestions\n\n"
+            "  orders\n"
+            "\n       orders-service/OrderProducerSchema vs test-repo/OrderConsumerSchema\n\n"
+            "         Fix on Producer side — copy & paste to your agent:\n\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on Consumer side — copy & paste to your agent:\n\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+            "```\n\n"
         )
 
     def test_how_to_fix_prints_fix_suggestions_with_generic_labels(
@@ -617,6 +803,45 @@ class TestPrintFixSuggestionsReport:
             "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
             "\n"
             "\n"
+        )
+
+    def test_markdown_no_op_when_no_suggestions(self) -> None:
+        report = FixSuggestionsReport(suggestions=[])
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name=None, markdown=True)
+
+        assert buf.getvalue() == ""
+
+    def test_markdown_wraps_suggestions_in_fenced_block(self) -> None:
+        pair = PairFixSuggestion(
+            producer_id="svc-a/OrderProducerSchema",
+            consumer_id="svc-b/OrderConsumerSchema",
+            producer_suggestions="1. Change the type of field 'id' from 'string' to 'integer'.",
+            consumer_suggestions="1. Change the type of field 'id' from 'integer' to 'string'.",
+        )
+        report = FixSuggestionsReport(
+            suggestions=[TopicFixSuggestions(topic="orders", pairs=[pair])]
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_fix_suggestions_report(report, local_name=None, markdown=True)
+
+        assert buf.getvalue() == (
+            "```\n"
+            "\nFix Suggestions\n\n"
+            "  orders\n"
+            "\n       svc-a/OrderProducerSchema vs svc-b/OrderConsumerSchema\n\n"
+            "         Fix on Producer side — copy & paste to your agent:\n\n"
+            "           1. Change the type of field 'id' from 'string' to 'integer'.\n"
+            "\n"
+            "         Fix on Consumer side — copy & paste to your agent:\n\n"
+            "           1. Change the type of field 'id' from 'integer' to 'string'.\n"
+            "\n"
+            "\n"
+            "```\n\n"
         )
 
     def test_numbers_multiple_violations_in_block(self) -> None:
