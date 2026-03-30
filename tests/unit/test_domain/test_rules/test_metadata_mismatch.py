@@ -707,3 +707,243 @@ class TestMetadataMismatchRule:
             producer_suggestion=("Change metadata 'format' on field 'created_at' to 'timestamp'."),
             consumer_suggestion=("Change metadata 'format' on field 'created_at' to 'iso8601'."),
         )
+
+    def test_forbidden_values_returns_violation_when_producer_does_not_cover_all_consumer_forbidden(
+        self,
+    ) -> None:
+        producer = create_field(metadata={"forbidden_values": ["deleted"]})
+        consumer = create_field(metadata={"forbidden_values": ["deleted", "banned"]})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_FORBIDDEN_VALUES_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"forbidden_values": ["deleted"]},
+            "consumer": {"forbidden_values": ["deleted", "banned"]},
+            "message": (
+                "Field 'field' Producer does not forbid ['banned']"
+                " which Consumer rejects — Producer may emit values Consumer will reject."
+            ),
+        }
+
+    def test_forbidden_values_returns_violation_when_producer_has_no_forbidden_values(
+        self,
+    ) -> None:
+        producer = create_field()
+        consumer = create_field(metadata={"forbidden_values": ["deleted", "banned"]})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_FORBIDDEN_VALUES_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"forbidden_values": None},
+            "consumer": {"forbidden_values": ["deleted", "banned"]},
+            "message": (
+                "Field 'field' Producer has no forbidden-values constraint"
+                " but Consumer forbids some values"
+                " — Producer may emit values Consumer will reject."
+            ),
+        }
+
+    def test_forbidden_values_returns_empty_when_producer_is_superset_of_consumer(self) -> None:
+        producer = create_field(metadata={"forbidden_values": ["deleted", "banned", "suspended"]})
+        consumer = create_field(metadata={"forbidden_values": ["deleted", "banned"]})
+
+        assert MetadataMismatchRule().check(producer, consumer) == []
+
+    def test_forbidden_values_returns_empty_when_consumer_has_no_forbidden_values(self) -> None:
+        producer = create_field(metadata={"forbidden_values": ["deleted"]})
+        consumer = create_field()
+
+        assert MetadataMismatchRule().check(producer, consumer) == []
+
+    def test_contains_only_returns_violation_when_producer_can_emit_items_consumer_rejects(
+        self,
+    ) -> None:
+        producer = create_field(metadata={"contains_only": ["red", "green", "blue", "yellow"]})
+        consumer = create_field(metadata={"contains_only": ["red", "green", "blue"]})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_CONTAINS_ONLY_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"contains_only": ["red", "green", "blue", "yellow"]},
+            "consumer": {"contains_only": ["red", "green", "blue"]},
+            "message": (
+                "Field 'field' Producer can emit items ['yellow'] that Consumer does not accept."
+            ),
+        }
+
+    def test_contains_only_returns_violation_when_producer_has_no_contains_only(self) -> None:
+        producer = create_field()
+        consumer = create_field(metadata={"contains_only": ["red", "green", "blue"]})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_CONTAINS_ONLY_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"contains_only": None},
+            "consumer": {"contains_only": ["red", "green", "blue"]},
+            "message": (
+                "Field 'field' Producer has no contains-only constraint"
+                " but Consumer restricts accepted items"
+                " — Producer may emit items Consumer will reject."
+            ),
+        }
+
+    def test_contains_only_returns_empty_when_producer_choices_are_subset_of_consumer(
+        self,
+    ) -> None:
+        producer = create_field(metadata={"contains_only": ["red", "green"]})
+        consumer = create_field(metadata={"contains_only": ["red", "green", "blue"]})
+
+        assert MetadataMismatchRule().check(producer, consumer) == []
+
+    def test_contains_only_returns_empty_when_consumer_has_no_contains_only(self) -> None:
+        producer = create_field(metadata={"contains_only": ["red"]})
+        consumer = create_field()
+
+        assert MetadataMismatchRule().check(producer, consumer) == []
+
+    def test_contains_none_of_returns_violation_when_producer_does_not_cover_all_consumer_excluded(
+        self,
+    ) -> None:
+        producer = create_field(metadata={"contains_none_of": ["profanity"]})
+        consumer = create_field(metadata={"contains_none_of": ["profanity", "spam"]})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_CONTAINS_NONE_OF_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"contains_none_of": ["profanity"]},
+            "consumer": {"contains_none_of": ["profanity", "spam"]},
+            "message": (
+                "Field 'field' Producer does not exclude ['spam']"
+                " which Consumer rejects — Producer may include items Consumer will reject."
+            ),
+        }
+
+    def test_contains_none_of_returns_violation_when_producer_has_no_contains_none_of(
+        self,
+    ) -> None:
+        producer = create_field()
+        consumer = create_field(metadata={"contains_none_of": ["profanity"]})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_CONTAINS_NONE_OF_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"contains_none_of": None},
+            "consumer": {"contains_none_of": ["profanity"]},
+            "message": (
+                "Field 'field' Producer has no contains-none-of constraint"
+                " but Consumer excludes some items"
+                " — Producer may include items Consumer will reject."
+            ),
+        }
+
+    def test_contains_none_of_returns_empty_when_producer_is_superset_of_consumer(self) -> None:
+        producer = create_field(metadata={"contains_none_of": ["profanity", "spam", "ads"]})
+        consumer = create_field(metadata={"contains_none_of": ["profanity", "spam"]})
+
+        assert MetadataMismatchRule().check(producer, consumer) == []
+
+    def test_contains_none_of_returns_empty_when_consumer_has_no_contains_none_of(self) -> None:
+        producer = create_field(metadata={"contains_none_of": ["profanity"]})
+        consumer = create_field()
+
+        assert MetadataMismatchRule().check(producer, consumer) == []
+
+    def test_equal_mismatch_uses_generic_key_mismatch_rule(self) -> None:
+        producer = create_field(metadata={"equal": "active"})
+        consumer = create_field(metadata={"equal": "pending"})
+
+        violations = MetadataMismatchRule().check(producer, consumer)
+
+        assert len(violations) == 1
+        assert violations[0].to_dict() == {
+            "rule": "METADATA_KEY_MISMATCH",
+            "severity": "CRITICAL",
+            "field_path": "field",
+            "producer": {"equal": "active"},
+            "consumer": {"equal": "pending"},
+            "message": (
+                "Field 'field' has mismatched metadata 'equal':"
+                " Producer has 'active', Consumer expects 'pending'."
+            ),
+        }
+
+    def test_suggest_fix_forbidden_values_when_producer_unconstrained(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_FORBIDDEN_VALUES_MISMATCH,
+            field_path="status",
+            producer={"forbidden_values": None},
+            consumer={"forbidden_values": ["deleted", "banned"]},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Add a NoneOf constraint to field 'status'"
+                " that forbids at least ['deleted', 'banned']."
+            ),
+            consumer_suggestion=(
+                "Reduce the forbidden_values constraint on field 'status'"
+                " to only include values the producer also forbids."
+            ),
+        )
+
+    def test_suggest_fix_contains_only_when_producer_unconstrained(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_CONTAINS_ONLY_MISMATCH,
+            field_path="colors",
+            producer={"contains_only": None},
+            consumer={"contains_only": ["red", "green", "blue"]},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Add a ContainsOnly constraint to field 'colors'"
+                " restricting emitted items to a subset of ['red', 'green', 'blue']."
+            ),
+            consumer_suggestion=(
+                "Expand the ContainsOnly constraint on field 'colors'"
+                " to include all items the producer may emit."
+            ),
+        )
+
+    def test_suggest_fix_contains_none_of_when_producer_unconstrained(self) -> None:
+        violation = create_violation(
+            RuleName.METADATA_CONTAINS_NONE_OF_MISMATCH,
+            field_path="tags",
+            producer={"contains_none_of": None},
+            consumer={"contains_none_of": ["profanity"]},
+        )
+
+        assert MetadataMismatchRule().suggest_fix(violation) == FixSuggestion(
+            producer_suggestion=(
+                "Add a ContainsNoneOf constraint to field 'tags'"
+                " that excludes at least ['profanity']."
+            ),
+            consumer_suggestion=(
+                "Reduce the ContainsNoneOf constraint on field 'tags'"
+                " to only include values the producer also excludes."
+            ),
+        )

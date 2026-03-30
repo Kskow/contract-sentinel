@@ -820,3 +820,86 @@ class TestMarshmallowParser:
             "is_supported": True,
             "metadata": {"format": "date-time", "custom_format": "iso"},
         }
+
+    def test_equal_validator_appears_as_equal_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            status = ma.fields.String(validate=mv.Equal("active"))
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert field == {
+            "name": "status",
+            "type": "string",
+            "is_required": False,
+            "is_nullable": False,
+            "is_supported": True,
+            "metadata": {"equal": "active"},
+        }
+
+    def test_none_of_validator_appears_as_forbidden_values_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            status = ma.fields.String(validate=mv.NoneOf(["deleted", "banned"]))
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert field == {
+            "name": "status",
+            "type": "string",
+            "is_required": False,
+            "is_nullable": False,
+            "is_supported": True,
+            "metadata": {"forbidden_values": ["deleted", "banned"]},
+        }
+
+    def test_contains_only_validator_appears_as_contains_only_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            colors = ma.fields.String(validate=mv.ContainsOnly(["red", "green", "blue"]))
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert field == {
+            "name": "colors",
+            "type": "string",
+            "is_required": False,
+            "is_nullable": False,
+            "is_supported": True,
+            "metadata": {"contains_only": ["red", "green", "blue"]},
+        }
+
+    @pytest.mark.skipif(
+        not hasattr(mv, "ContainsNoneOf"), reason="ContainsNoneOf requires marshmallow >= 3.19"
+    )
+    def test_contains_none_of_validator_appears_as_contains_none_of_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            tags = ma.fields.String(validate=mv.ContainsNoneOf(["profanity"]))
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert field == {
+            "name": "tags",
+            "type": "string",
+            "is_required": False,
+            "is_nullable": False,
+            "is_supported": True,
+            "metadata": {"contains_none_of": ["profanity"]},
+        }
+
+    def test_and_wrapping_none_of_extracts_forbidden_values_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            status = ma.fields.String(validate=mv.And(mv.Length(max=20), mv.NoneOf(["deleted"])))
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert field == {
+            "name": "status",
+            "type": "string",
+            "is_required": False,
+            "is_nullable": False,
+            "is_supported": True,
+            "metadata": {"length": {"max": 20}, "forbidden_values": ["deleted"]},
+        }

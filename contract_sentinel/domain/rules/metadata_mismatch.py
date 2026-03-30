@@ -47,6 +47,12 @@ class MetadataMismatchRule(Rule):
                     violations.extend(self._compare_range(producer, consumer))
                 case "length":
                     violations.extend(self._compare_length(producer, consumer))
+                case "forbidden_values":
+                    violations.extend(self._compare_forbidden_values(producer, consumer))
+                case "contains_only":
+                    violations.extend(self._compare_contains_only(producer, consumer))
+                case "contains_none_of":
+                    violations.extend(self._compare_contains_none_of(producer, consumer))
                 case _:
                     violations.extend(self._check_key_mismatch(producer, consumer, key))
 
@@ -295,6 +301,135 @@ class MetadataMismatchRule(Rule):
 
         return violations
 
+    def _compare_forbidden_values(
+        self, producer: ContractField, consumer: ContractField
+    ) -> list[Violation]:
+        """Fails when the producer can still emit values the consumer forbids."""
+        consumer_forbidden: list[Any] = consumer.metadata.get("forbidden_values")  # type: ignore[union-attr]
+        producer_forbidden: list[Any] | None = (producer.metadata or {}).get("forbidden_values")
+        field_path = producer.name
+
+        if producer_forbidden is None:
+            return [
+                Violation(
+                    rule=RuleName.METADATA_FORBIDDEN_VALUES_MISMATCH,
+                    severity="CRITICAL",
+                    field_path=field_path,
+                    producer={"forbidden_values": None},
+                    consumer={"forbidden_values": consumer_forbidden},
+                    message=(
+                        f"Field '{field_path}' Producer has no forbidden-values constraint"
+                        " but Consumer forbids some values"
+                        " — Producer may emit values Consumer will reject."
+                    ),
+                )
+            ]
+
+        not_covered = set(consumer_forbidden) - set(producer_forbidden)
+        if not not_covered:
+            return []
+
+        return [
+            Violation(
+                rule=RuleName.METADATA_FORBIDDEN_VALUES_MISMATCH,
+                severity="CRITICAL",
+                field_path=field_path,
+                producer={"forbidden_values": producer_forbidden},
+                consumer={"forbidden_values": consumer_forbidden},
+                message=(
+                    f"Field '{field_path}' Producer does not forbid"
+                    f" {sorted(not_covered, key=str)!r}"
+                    " which Consumer rejects — Producer may emit values Consumer will reject."
+                ),
+            )
+        ]
+
+    def _compare_contains_only(
+        self, producer: ContractField, consumer: ContractField
+    ) -> list[Violation]:
+        """Fails when the producer can emit list items the consumer does not accept."""
+        consumer_choices: list[Any] = consumer.metadata.get("contains_only")  # type: ignore[union-attr]
+        producer_choices: list[Any] | None = (producer.metadata or {}).get("contains_only")
+        field_path = producer.name
+
+        if producer_choices is None:
+            return [
+                Violation(
+                    rule=RuleName.METADATA_CONTAINS_ONLY_MISMATCH,
+                    severity="CRITICAL",
+                    field_path=field_path,
+                    producer={"contains_only": None},
+                    consumer={"contains_only": consumer_choices},
+                    message=(
+                        f"Field '{field_path}' Producer has no contains-only constraint"
+                        " but Consumer restricts accepted items"
+                        " — Producer may emit items Consumer will reject."
+                    ),
+                )
+            ]
+
+        unexpected = set(producer_choices) - set(consumer_choices)
+        if not unexpected:
+            return []
+
+        return [
+            Violation(
+                rule=RuleName.METADATA_CONTAINS_ONLY_MISMATCH,
+                severity="CRITICAL",
+                field_path=field_path,
+                producer={"contains_only": producer_choices},
+                consumer={"contains_only": consumer_choices},
+                message=(
+                    f"Field '{field_path}' Producer can emit items"
+                    f" {sorted(unexpected, key=str)!r}"
+                    " that Consumer does not accept."
+                ),
+            )
+        ]
+
+    def _compare_contains_none_of(
+        self, producer: ContractField, consumer: ContractField
+    ) -> list[Violation]:
+        """Fails when the producer can include list items the consumer excludes."""
+        consumer_none_of: list[Any] = consumer.metadata.get("contains_none_of")  # type: ignore[union-attr]
+        producer_none_of: list[Any] | None = (producer.metadata or {}).get("contains_none_of")
+        field_path = producer.name
+
+        if producer_none_of is None:
+            return [
+                Violation(
+                    rule=RuleName.METADATA_CONTAINS_NONE_OF_MISMATCH,
+                    severity="CRITICAL",
+                    field_path=field_path,
+                    producer={"contains_none_of": None},
+                    consumer={"contains_none_of": consumer_none_of},
+                    message=(
+                        f"Field '{field_path}' Producer has no contains-none-of constraint"
+                        " but Consumer excludes some items"
+                        " — Producer may include items Consumer will reject."
+                    ),
+                )
+            ]
+
+        not_covered = set(consumer_none_of) - set(producer_none_of)
+        if not not_covered:
+            return []
+
+        return [
+            Violation(
+                rule=RuleName.METADATA_CONTAINS_NONE_OF_MISMATCH,
+                severity="CRITICAL",
+                field_path=field_path,
+                producer={"contains_none_of": producer_none_of},
+                consumer={"contains_none_of": consumer_none_of},
+                message=(
+                    f"Field '{field_path}' Producer does not exclude"
+                    f" {sorted(not_covered, key=str)!r}"
+                    " which Consumer rejects — Producer may include items Consumer will reject."
+                ),
+            )
+        ]
+
     def suggest_fix(self, violation: Violation) -> FixSuggestion | None:
         path = violation.field_path
         producer = violation.producer
@@ -349,6 +484,60 @@ class MetadataMismatchRule(Rule):
                     ),
                     consumer_suggestion=(
                         f"Change metadata '{key}' on field '{path}' to '{producer[key]}'."
+                    ),
+                )
+            case RuleName.METADATA_FORBIDDEN_VALUES_MISMATCH:
+                if producer.get("forbidden_values") is None:
+                    producer_instruction = (
+                        f"Add a NoneOf constraint to field '{path}'"
+                        f" that forbids at least {consumer['forbidden_values']}."
+                    )
+                else:
+                    producer_instruction = (
+                        f"Expand the NoneOf constraint on field '{path}'"
+                        f" to also forbid {consumer['forbidden_values']}."
+                    )
+                return FixSuggestion(
+                    producer_suggestion=producer_instruction,
+                    consumer_suggestion=(
+                        f"Reduce the forbidden_values constraint on field '{path}'"
+                        " to only include values the producer also forbids."
+                    ),
+                )
+            case RuleName.METADATA_CONTAINS_ONLY_MISMATCH:
+                if producer.get("contains_only") is None:
+                    producer_instruction = (
+                        f"Add a ContainsOnly constraint to field '{path}'"
+                        f" restricting emitted items to a subset of {consumer['contains_only']}."
+                    )
+                else:
+                    producer_instruction = (
+                        f"Restrict the ContainsOnly constraint on field '{path}'"
+                        f" to {consumer['contains_only']}."
+                    )
+                return FixSuggestion(
+                    producer_suggestion=producer_instruction,
+                    consumer_suggestion=(
+                        f"Expand the ContainsOnly constraint on field '{path}'"
+                        " to include all items the producer may emit."
+                    ),
+                )
+            case RuleName.METADATA_CONTAINS_NONE_OF_MISMATCH:
+                if producer.get("contains_none_of") is None:
+                    producer_instruction = (
+                        f"Add a ContainsNoneOf constraint to field '{path}'"
+                        f" that excludes at least {consumer['contains_none_of']}."
+                    )
+                else:
+                    producer_instruction = (
+                        f"Expand the ContainsNoneOf constraint on field '{path}'"
+                        f" to also exclude {consumer['contains_none_of']}."
+                    )
+                return FixSuggestion(
+                    producer_suggestion=producer_instruction,
+                    consumer_suggestion=(
+                        f"Reduce the ContainsNoneOf constraint on field '{path}'"
+                        " to only include values the producer also excludes."
                     ),
                 )
             case _:
