@@ -126,6 +126,27 @@ validate-contracts:
 | | `--how-to-fix` | off | Print copy-paste fix suggestions for each failing pair |
 | | `--markdown` | off | Format output as Markdown for use as a PR comment |
 
+## Parser Limitations
+
+The parser introspects schema classes **statically at import time**. Unsupported fields and validators fail silently — they are skipped and produce no contract entry, so the diff engine will not catch mismatches that involve them.
+
+### Marshmallow
+
+**Unsupported fields:**
+- `fields.Tuple` — positional heterogeneous types have no JSON Schema equivalent
+- `fields.Method`, `fields.Function` — return type is determined at runtime by a user-defined callable
+- Custom field subclasses — any type not in the built-in type map
+- `fields.Pluck` — treated as a full `Nested` object, but emits a bare scalar on the wire
+
+**Unsupported validators:**
+- Custom validator subclasses
+
+**Other limitations:**
+- Schema-level hooks (`@validates`, `@validates_schema`, `@pre_load`, `@post_load`) are not captured — constraints defined there are invisible to the diff engine.
+- Callable `load_default` / `dump_default` values (e.g. `load_default=list` or `load_default=lambda: {}`) are silently omitted from the contract. A callable is a runtime factory with no static JSON representation, so it carries no meaningful contract information. Scalar defaults (strings, ints, booleans, lists, dicts) are captured normally.
+
+---
+
 ## Contributing
 
 See `contributors/contributing.md` for local setup instructions, the full `just` command reference, and the PR workflow. To extend the library — adding a new validation rule, schema parser, or contract store — see the how-to guides in the same directory.
