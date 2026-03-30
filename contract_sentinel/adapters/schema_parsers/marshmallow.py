@@ -150,9 +150,9 @@ class MarshmallowParser(SchemaParser):
             # cannot narrow `field`, hence .constant is not visible to the type checker.
             metadata["constant"] = field.constant  # type: ignore[union-attr]
         else:
-            if field.load_default is not self._ma.missing:
+            if field.load_default is not self._ma.missing and not callable(field.load_default):
                 metadata["load_default"] = field.load_default
-            if field.dump_default is not self._ma.missing:
+            if field.dump_default is not self._ma.missing and not callable(field.dump_default):
                 metadata["dump_default"] = field.dump_default
 
         metadata.update(self._extract_validators(field))

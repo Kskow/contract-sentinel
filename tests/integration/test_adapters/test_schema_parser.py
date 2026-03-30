@@ -114,6 +114,33 @@ class TestMarshmallowParser:
 
         assert field["name"] == "orderId"
 
+    def test_callable_load_default_is_not_stored_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            tags = ma.fields.List(ma.fields.String(), load_default=list)
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert "load_default" not in field.get("metadata", {})
+
+    def test_callable_dump_default_is_not_stored_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            extra = ma.fields.Dict(dump_default=dict)
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert "dump_default" not in field.get("metadata", {})
+
+    def test_lambda_load_default_is_not_stored_in_metadata(self) -> None:
+        @contract(topic="t", role=Role.PRODUCER)
+        class MySchema(ma.Schema):
+            status = ma.fields.String(load_default=lambda: "active")
+
+        field = MarshmallowParser(repository="svc").parse(MySchema).to_dict()["fields"][0]
+
+        assert "load_default" not in field.get("metadata", {})
+
     def test_load_default_appears_in_metadata(self) -> None:
         @contract(topic="t", role=Role.PRODUCER)
         class MySchema(ma.Schema):
