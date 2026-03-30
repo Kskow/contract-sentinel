@@ -269,8 +269,18 @@ class MarshmallowParser(SchemaParser):
                 metadata["range"] = range_
         elif isinstance(validator, self._validate.Regexp):
             metadata["pattern"] = validator.regex.pattern
+        elif isinstance(validator, self._validate.ContainsOnly):
+            metadata["contains_only"] = list(validator.choices)
         elif isinstance(validator, self._validate.OneOf):
             metadata["allowed_values"] = list(validator.choices)
+        elif hasattr(self._validate, "ContainsNoneOf") and isinstance(
+            validator, self._validate.ContainsNoneOf
+        ):
+            metadata["contains_none_of"] = list(validator.iterable)
+        elif isinstance(validator, self._validate.NoneOf):
+            metadata["forbidden_values"] = list(validator.iterable)
+        elif isinstance(validator, self._validate.Equal):
+            metadata["equal"] = validator.comparable
 
     def _map_unknown(self, unknown: str) -> UnknownFieldBehaviour:
         return self._unknown_map.get(unknown, UnknownFieldBehaviour.FORBID)

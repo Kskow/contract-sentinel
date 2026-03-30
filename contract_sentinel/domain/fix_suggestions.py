@@ -31,6 +31,9 @@ RULE_REGISTRY: dict[RuleName, Rule | UndeclaredFieldRule] = {
     RuleName.METADATA_RANGE_MISMATCH: MetadataMismatchRule(),
     RuleName.METADATA_LENGTH_MISMATCH: MetadataMismatchRule(),
     RuleName.METADATA_KEY_MISMATCH: MetadataMismatchRule(),
+    RuleName.METADATA_FORBIDDEN_VALUES_MISMATCH: MetadataMismatchRule(),
+    RuleName.METADATA_CONTAINS_ONLY_MISMATCH: MetadataMismatchRule(),
+    RuleName.METADATA_CONTAINS_NONE_OF_MISMATCH: MetadataMismatchRule(),
 }
 
 
